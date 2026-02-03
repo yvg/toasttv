@@ -1,4 +1,8 @@
-# ToastTV 🍞
+<p align="center">
+  <img src="data/logo.png" alt="ToastTV" width="120">
+</p>
+
+# ToastTV
 
 **The warm, crispy, 90s television station for your Raspberry Pi.**
 
