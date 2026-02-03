@@ -1,0 +1,474 @@
+/**
+ * ToastTV Library Styles
+ *
+ * Media grid, media list, dropzone, toolbar, empty state
+ */
+
+/* --- Empty State --- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.empty-state h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state > p {
+  color: var(--text-secondary);
+  margin: 0.5rem 0;
+}
+
+.empty-state .empty-hint {
+  font-size: 0.875rem;
+}
+
+.empty-state code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--toast-teal);
+}
+
+/* --- Upload Zone --- */
+.upload-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  margin: 1.5rem 0;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.upload-zone.dragover {
+  border-color: var(--accent-primary);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.upload-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-zone p {
+  color: var(--text-secondary);
+  margin: 0.5rem 0;
+}
+
+.upload-or {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+}
+
+.upload-btn {
+  display: inline-block;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.cli-hint {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cli-hint p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* --- Library Page --- */
+.library {
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+}
+
+.library h1 {
+  margin-bottom: 1.5rem;
+}
+
+.placeholder {
+  color: var(--text-secondary);
+  margin: 1rem 0;
+}
+
+.media-section {
+  margin-top: 2rem;
+}
+
+.media-section h2 {
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+/* --- Media List View --- */
+.media-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius);
+}
+
+.media-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.interlude-item {
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.media-item-dates {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 2rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.media-item-dates label {
+  font-size: 0.75rem;
+}
+
+.media-item-dates input[type="date"] {
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.media-item-dates span {
+  color: var(--text-secondary);
+}
+
+.media-icon {
+  font-size: 1.25rem;
+}
+
+.media-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-duration {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.media-thumb {
+  width: 60px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  background-size: cover;
+  background-position: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.empty-list {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.toggle-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.toggle-btn:hover {
+  opacity: 1;
+}
+
+/* --- Type Selector --- */
+.type-select {
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.type-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.media-type-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+/* --- Library Toolbar --- */
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius);
+}
+
+.search-box {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.5rem 2.5rem 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.search-box input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.search-clear:hover {
+  color: var(--text-primary);
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-buttons a {
+  text-decoration: none;
+}
+
+.view-buttons {
+  display: flex;
+  gap: 0;
+}
+
+.view-buttons a {
+  text-decoration: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+.view-buttons a:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.view-buttons a:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+/* --- Grid View --- */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.media-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.media-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.interlude-card {
+  border: 2px solid var(--accent-secondary);
+}
+
+.media-card-thumb {
+  height: 120px;
+  background: rgba(255, 255, 255, 0.1);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.media-card-duration {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: white;
+}
+
+.media-card-thumb .status-pill {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.media-card-info {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.media-card-name {
+  flex: 1;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+/* --- Dropzone (New) --- */
+.dropzone {
+  border: 3px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 2rem;
+  margin: 1rem 0 1.5rem;
+  text-align: center;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s;
+  cursor: pointer;
+}
+
+.dropzone:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.dropzone.dragover {
+  border-color: var(--toast-green);
+  background: rgba(0, 210, 106, 0.1);
+  transform: scale(1.01);
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dropzone-icon {
+  font-size: 2.5rem;
+}
+
+.dropzone-text {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+.dropzone-or {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* --- Library Responsive --- */
+@media (max-width: 768px) {
+  .library {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .library-toolbar {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-buttons,
+  .view-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filter-buttons .btn,
+  .view-buttons .btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .dropzone {
+    padding: 1.5rem 1rem;
+  }
+
+  .media-item {
+    padding: 1rem;
+  }
+
+  .media-item-main {
+    flex-wrap: wrap;
+  }
+}

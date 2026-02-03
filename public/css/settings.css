@@ -1,0 +1,582 @@
+/**
+ * ToastTV Settings Styles
+ *
+ * Settings cards, forms, toggles, logo picker, date inputs
+ */
+
+/* --- Settings Container --- */
+.settings {
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.settings h1 {
+  margin-bottom: 2rem;
+  font-size: 1.75rem;
+}
+
+.settings-section {
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-section h2 {
+  font-size: 1.125rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-info {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.settings-info a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+/* --- Forms --- */
+.settings-form {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 500px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.form-group .hint {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(100px, auto);
+  gap: 1rem;
+}
+
+.form-actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg-primary) 80%, transparent);
+  padding: 1.5rem 0 1rem;
+  text-align: center;
+  z-index: 10;
+}
+
+/* --- Toggle Switch --- */
+.toggle-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-group label:first-child {
+  margin-bottom: 0;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  transition: background 0.3s;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: var(--accent-success);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+}
+
+/* --- Range Slider --- */
+input[type="range"] {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* --- Position Grid --- */
+.position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 90px;
+}
+
+.position-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.position-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.position-btn.active {
+  background: var(--accent-primary);
+  border-color: white;
+}
+
+.position-grid.corners-only {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  width: fit-content;
+}
+
+.position-grid.corners-only .position-btn {
+  width: 50px;
+  height: 40px;
+  font-size: 1.25rem;
+  background: var(--toast-yellow);
+  border: 2px solid #000;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.1s;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+  color: #000;
+}
+
+.position-grid.corners-only .position-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.position-grid.corners-only .position-btn.active {
+  background: var(--toast-orange);
+}
+
+/* --- Date Picker --- */
+.date-range {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.date-range input[type="date"] {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 12px;
+  margin-left: 0.5rem;
+}
+
+.status-pill.active {
+  background: rgba(42, 157, 143, 0.2);
+  color: var(--accent-success);
+}
+
+.status-pill.scheduled {
+  background: rgba(233, 196, 106, 0.2);
+  color: var(--accent-warning);
+}
+
+.status-pill.expired {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+/* --- Compact Upload Zone --- */
+.upload-zone-compact {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: var(--border-radius);
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.upload-zone-compact.dragover {
+  border-color: var(--accent-primary);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.cli-hint-inline {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.cli-hint-inline code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+/* --- Logo Picker --- */
+.logo-picker {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-preview {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.logo-placeholder {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.logo-screen-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #2d1f3d 0%, #1a2a3a 100%);
+  border: 3px solid #000;
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.screen-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.screen-logo {
+  position: absolute;
+  max-width: 60px;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.logo-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.logo-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.logo-preview-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- Settings Card Grid --- */
+.settings-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 600px) {
+  .settings-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+.settings-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: var(--border-cartoon);
+  box-shadow: var(--shadow-cartoon);
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
+}
+
+.settings-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+}
+
+.settings-card-full {
+  grid-column: 1 / -1;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.card-note {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-note a {
+  color: var(--toast-teal);
+  text-decoration: underline;
+}
+
+.path-display {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--toast-teal);
+  word-break: break-all;
+}
+
+/* --- Compact Date Picker --- */
+.date-picker-container {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-left: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+.date-picker-container:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.date-input-compact {
+  width: 50px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  text-align: center;
+  font-family: inherit;
+  padding: 0.1rem 0;
+  transition: all 0.2s;
+}
+
+.date-input-compact::placeholder {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  opacity: 0.5;
+}
+
+.date-input-compact:focus {
+  outline: none;
+  border-bottom-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.date-separator {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0 0.1rem;
+}
+
+.btn-clear-date {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 0.15rem 0 0.35rem;
+  line-height: 0.8;
+  display: flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: all 0.2s;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  margin-left: 0.25rem;
+}
+
+.btn-clear-date:hover {
+  color: var(--toast-pink);
+  opacity: 1;
+}
+
+/* --- Settings Responsive --- */
+@media (max-width: 768px) {
+  .settings {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .logo-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card {
+    padding: 1rem;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+}

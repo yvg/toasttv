@@ -1,0 +1,301 @@
+/**
+ * ToastTV Base Styles
+ *
+ * Variables, reset, navbar, buttons, toasts, code
+ */
+
+/* --- CSS Variables --- */
+:root {
+  /* 90s Cartoon TV Palette - ToastTV color palette */
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #0f3460;
+  --text-primary: #ffffff;
+  --text-secondary: #b8c5d6;
+  /* Vibrant 90s colors */
+  --toast-orange: #ff6b35;
+  --toast-green: #00d26a;
+  --toast-purple: #9b59b6;
+  --toast-pink: #ff3366;
+  --toast-yellow: #ffd93d;
+  --toast-teal: #00cec9;
+  /* Utility mapping */
+  --accent-primary: var(--toast-pink);
+  --accent-secondary: var(--toast-orange);
+  --accent-success: var(--toast-green);
+  --accent-warning: var(--toast-yellow);
+  --border-radius: 12px;
+  --shadow-cartoon: 4px 4px 0 rgba(0, 0, 0, 0.8);
+  --border-cartoon: 3px solid #000;
+  /* Glass/frost effects (reusable) */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: linear-gradient(135deg, #1a1b2e 0%, #2d1f3d 50%, #1a2a3a 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* Fix visited links */
+a,
+a:visited {
+  color: inherit;
+}
+
+/* --- Navbar --- */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: var(--toast-orange);
+  border-bottom: var(--border-cartoon);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #000;
+  text-decoration: none;
+}
+
+.nav-logo {
+  height: 40px;
+  width: auto;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-links a {
+  color: #000;
+  text-decoration: none;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  background: var(--toast-yellow);
+  border: 2px solid #000;
+  border-radius: 8px;
+  transition: all 0.1s;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.nav-links a:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* --- Container --- */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* --- Buttons --- */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #000;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+}
+
+.btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--toast-pink);
+  color: white;
+}
+
+.btn-secondary {
+  background: var(--toast-teal);
+  color: #000;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.btn-small.active {
+  background: var(--accent-secondary);
+  color: white;
+}
+
+.btn-large {
+  padding: 1rem 2.5rem;
+  font-size: 1.125rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* --- Toast Notifications --- */
+#toast-container {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 1000;
+}
+
+.toast {
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+  margin-top: 0.5rem;
+  animation: slideIn 0.3s ease;
+}
+
+.toast.success {
+  background: var(--toast-green);
+  color: #000;
+}
+
+.toast.warning {
+  background: var(--toast-yellow);
+  color: #000;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.toast-dismiss {
+  animation: slideOut 0.3s ease forwards;
+}
+
+/* --- Loading & Code --- */
+.loading {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: "Fira Code", monospace;
+}
+
+/* --- Base Responsive --- */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .logo {
+    font-size: 1.25rem;
+  }
+
+  .nav-links {
+    gap: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .container {
+    padding: 1rem;
+  }
+
+  .button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .btn {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  #toast-container {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .toast {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .button-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Coarse pointer devices (touch) */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
+
+  select,
+  input[type="number"],
+  input[type="text"] {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
