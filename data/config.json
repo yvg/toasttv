@@ -1,0 +1,6 @@
+{
+  "paths": {
+    "media": "./media",
+    "database": "./data/media.db"
+  }
+}
