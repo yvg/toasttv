@@ -1,0 +1,198 @@
+/**
+ * VLC Remote Control Client
+ *
+ * Connects to VLC's telnet-based RC interface for programmatic control.
+ * Uses Bun's native TCP socket API.
+ */
+
+import type { Socket } from 'bun'
+import type { IVlcController, PlaybackStatus, VlcConfig } from '../types'
+
+export class VlcConnectionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VlcConnectionError'
+  }
+}
+
+export class VlcClient implements IVlcController {
+  private socket: Socket<unknown> | null = null
+  private connected = false
+  private responseBuffer = ''
+
+  constructor(private readonly config: VlcConfig) {}
+
+  get isConnected(): boolean {
+    return this.connected
+  }
+
+  async connect(): Promise<void> {
+    let attempts = 0
+
+    while (attempts < this.config.maxReconnectAttempts) {
+      try {
+        await this.attemptConnection()
+        console.log(
+          `Connected to VLC at ${this.config.host}:${this.config.port}`
+        )
+        return
+      } catch (error) {
+        attempts++
+        console.warn(
+          `VLC connection attempt ${attempts} failed. Retrying in ${this.config.reconnectDelayMs}ms...`
+        )
+        await Bun.sleep(this.config.reconnectDelayMs)
+      }
+    }
+
+    throw new VlcConnectionError(
+      `Failed to connect to VLC after ${this.config.maxReconnectAttempts} attempts`
+    )
+  }
+
+  private attemptConnection(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      Bun.connect({
+        hostname: this.config.host,
+        port: this.config.port,
+        socket: {
+          open: (socket) => {
+            this.socket = socket
+            this.connected = true
+            resolve()
+          },
+          data: (_socket, data) => {
+            this.responseBuffer += data.toString()
+          },
+          close: () => {
+            this.connected = false
+          },
+          error: (_socket, error) => {
+            this.connected = false
+            reject(error)
+          },
+        },
+      })
+    })
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.socket) {
+      this.socket.end()
+      this.socket = null
+    }
+    this.connected = false
+    console.log('Disconnected from VLC')
+  }
+
+  private async sendCommand(command: string): Promise<string> {
+    if (!this.connected || !this.socket) {
+      throw new VlcConnectionError('Not connected to VLC')
+    }
+
+    this.responseBuffer = ''
+    this.socket.write(`${command}\n`)
+
+    // Wait for response
+    await Bun.sleep(100)
+    return this.responseBuffer.trim()
+  }
+
+  async play(path: string): Promise<void> {
+    await this.sendCommand('clear')
+    await this.sendCommand(`add ${path}`)
+    await this.sendCommand('play')
+    console.log(`Playing: ${path}`)
+  }
+
+  async enqueue(path: string): Promise<void> {
+    await this.sendCommand(`enqueue ${path}`)
+  }
+
+  async pause(): Promise<void> {
+    await this.sendCommand('pause')
+  }
+
+  async stop(): Promise<void> {
+    await this.sendCommand('stop')
+  }
+
+  async next(): Promise<void> {
+    await this.sendCommand('next')
+  }
+
+  async getStatus(): Promise<PlaybackStatus> {
+    // VLC's RC interface can be flaky. We send commands one at a time
+    // and parse only the first numeric value from each response.
+
+    const parseFirstNumber = (s: string): number => {
+      const match = s.match(/\d+/)
+      return match ? parseInt(match[0], 10) : 0
+    }
+
+    // is_playing returns "1" or "0"
+    const isPlayingResponse = await this.sendCommand('is_playing')
+    const isPlaying = isPlayingResponse.includes('1')
+
+    // get_time returns current position in seconds
+    const positionResponse = await this.sendCommand('get_time')
+    const positionSeconds = parseFirstNumber(positionResponse)
+
+    // get_length returns total duration in seconds
+    // NOTE: This can be unreliable during track transitions.
+    // The UI should prefer the cached duration from MediaItem when available.
+    const lengthResponse = await this.sendCommand('get_length')
+    const durationSeconds = parseFirstNumber(lengthResponse)
+
+    // get_title for display (optional, often empty)
+    const titleResponse = await this.sendCommand('get_title')
+
+    return {
+      isPlaying,
+      currentFile: titleResponse || null,
+      positionSeconds,
+      durationSeconds,
+    }
+  }
+
+  /**
+   * Set logo overlay.
+   * @param path Path to logo image file (PNG with transparency recommended)
+   * @param opacity 0-255
+   * @param position 0-8 (grid: 0=center, 1=left, 2=right, 4=top, 8=bottom, combinations for corners)
+   */
+  async setLogo(
+    path: string,
+    opacity: number = 200,
+    position: number = 6
+  ): Promise<void> {
+    // VLC logo position mapping:
+    // 0=center, 1=left, 2=right, 4=top, 8=bottom
+    // Combinations: 5=top-left, 6=top-right, 9=bottom-left, 10=bottom-right
+    const positionMap: Record<number, number> = {
+      0: 5, // top-left
+      1: 4, // top-center
+      2: 6, // top-right
+      3: 1, // middle-left
+      4: 0, // center
+      5: 2, // middle-right
+      6: 9, // bottom-left
+      7: 8, // bottom-center
+      8: 10, // bottom-right
+    }
+
+    const vlcPosition = positionMap[position] ?? 6
+
+    await this.sendCommand(`logo-file ${path}`)
+    await this.sendCommand(`logo-opacity ${opacity}`)
+    await this.sendCommand(`logo-position ${vlcPosition}`)
+    console.log(
+      `Logo set: ${path} (opacity: ${opacity}, position: ${vlcPosition})`
+    )
+  }
+
+  async clearLogo(): Promise<void> {
+    await this.sendCommand('logo-file')
+    console.log('Logo cleared')
+  }
+}
