@@ -65,11 +65,3 @@ src/
 Two-tier config:
 - **Bootstrap** (`data/config.json`): Paths, ports
 - **Runtime** (SQLite): Session limits, interludes
-
-## Testing
-
-```bash
-bun test
-```
-
-Tests use mocked dependencies (no VLC required).
