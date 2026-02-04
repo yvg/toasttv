@@ -109,6 +109,10 @@ export class VlcClient implements IVlcController {
     await this.sendCommand(`enqueue ${path}`)
   }
 
+  async clear(): Promise<void> {
+    await this.sendCommand('clear')
+  }
+
   async pause(): Promise<void> {
     await this.sendCommand('pause')
   }

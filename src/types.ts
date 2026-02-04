@@ -78,6 +78,7 @@ export interface IVlcController {
   stop(): Promise<void>
   next(): Promise<void>
   enqueue(path: string): Promise<void>
+  clear(): Promise<void>
   setLoop(enabled: boolean): Promise<void>
   getStatus(): Promise<PlaybackStatus>
 }

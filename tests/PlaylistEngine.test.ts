@@ -305,4 +305,166 @@ describe('PlaylistEngine', () => {
     // remaining 4 IDs must be the others.
     expect(uniqueIds.size).toBe(4)
   })
+
+  test('skipQuotaForToday makes session infinite (no outro due to limit)', async () => {
+    const dateTime = new FakeDateTimeProvider(new Date('2024-01-01T10:00:00'))
+    const showVideo = buildMediaItem({
+      id: 1,
+      filename: 'show.mp4',
+      durationSeconds: 600, // 10min
+    })
+    const outroVideo = buildMediaItem({
+      id: 88,
+      filename: 'outro.mp4',
+      mediaType: 'outro',
+      durationSeconds: 60,
+    })
+
+    const repo = buildMockRepository([showVideo, outroVideo])
+    repo.getById = mock((id) =>
+      Promise.resolve(id === 88 ? outroVideo : id === 1 ? showVideo : null)
+    )
+
+    const configData = buildAppConfig({
+      session: { limitMinutes: 30, outroVideoId: 88 },
+    })
+    const config = buildMockConfig(configData)
+
+    const engine = createEngine(config, repo, dateTime)
+
+    // Skip quota BEFORE starting session
+    engine.skipQuotaForToday()
+
+    // Start session - should now be infinite
+    const first = await engine.startSession()
+    expect(first?.filename).toBe('show.mp4')
+
+    // With quota skipped, queue should NOT be marked complete after 30min worth of content
+    // It should keep generating (buffer mode)
+    const second = await engine.getNextVideo()
+    expect(second?.filename).toBe('show.mp4') // Not outro
+
+    const third = await engine.getNextVideo()
+    expect(third?.filename).toBe('show.mp4') // Still not outro
+
+    const fourth = await engine.getNextVideo()
+    expect(fourth?.filename).toBe('show.mp4') // Still generating shows
+
+    // Session should still be active (infinite)
+    expect(engine.isSessionActive).toBe(true)
+  })
+
+  test('skipQuotaForToday after session start converts to infinite', async () => {
+    const dateTime = new FakeDateTimeProvider(new Date('2024-01-01T10:00:00'))
+    const showVideo = buildMediaItem({
+      id: 1,
+      filename: 'show.mp4',
+      durationSeconds: 600, // 10min
+    })
+    const outroVideo = buildMediaItem({
+      id: 88,
+      filename: 'outro.mp4',
+      mediaType: 'outro',
+      durationSeconds: 60,
+    })
+
+    const repo = buildMockRepository([showVideo, outroVideo])
+    repo.getById = mock((id) =>
+      Promise.resolve(id === 88 ? outroVideo : id === 1 ? showVideo : null)
+    )
+
+    const configData = buildAppConfig({
+      session: { limitMinutes: 30, outroVideoId: 88 },
+    })
+    const config = buildMockConfig(configData)
+
+    const engine = createEngine(config, repo, dateTime)
+
+    // Start session normally (finite)
+    await engine.startSession()
+
+    // Now skip quota mid-session
+    engine.skipQuotaForToday()
+
+    // Pull enough videos to exhaust the original limit
+    let playedVideos: string[] = []
+    for (let i = 0; i < 10; i++) {
+      const v = await engine.getNextVideo()
+      if (!v) break
+      playedVideos.push(v.filename)
+    }
+
+    // Should have played multiple shows without hitting outro
+    // (original queue might have had outro, but new fills won't add it)
+    expect(playedVideos.length).toBeGreaterThan(3)
+    expect(engine.isSessionActive).toBe(true)
+  })
+
+  test('session ends after outro (triggers off-air)', async () => {
+    const dateTime = new FakeDateTimeProvider(new Date('2024-01-01T10:00:00'))
+    const showVideo = buildMediaItem({
+      id: 1,
+      filename: 'show.mp4',
+      durationSeconds: 600, // 10min
+    })
+    const outroVideo = buildMediaItem({
+      id: 88,
+      filename: 'outro.mp4',
+      mediaType: 'outro',
+      durationSeconds: 60,
+    })
+
+    const repo = buildMockRepository([showVideo, outroVideo])
+    repo.getById = mock((id) =>
+      Promise.resolve(id === 88 ? outroVideo : id === 1 ? showVideo : null)
+    )
+
+    const configData = buildAppConfig({
+      session: { limitMinutes: 30, outroVideoId: 88 },
+    })
+    const config = buildMockConfig(configData)
+
+    const engine = createEngine(config, repo, dateTime)
+
+    // Start and play through all videos
+    await engine.startSession() // show
+    await engine.getNextVideo() // show
+    await engine.getNextVideo() // show
+    const outro = await engine.getNextVideo() // outro
+    expect(outro?.filename).toBe('outro.mp4')
+
+    // After outro, getNextVideo should return null → triggers off-air
+    const afterOutro = await engine.getNextVideo()
+    expect(afterOutro).toBeNull()
+    expect(engine.isSessionActive).toBe(false)
+  })
+
+  test('peekQueue shows upcoming videos without consuming', async () => {
+    const videos = [
+      buildMediaItem({ id: 1, filename: 'show1.mp4', durationSeconds: 60 }),
+      buildMediaItem({ id: 2, filename: 'show2.mp4', durationSeconds: 60 }),
+      buildMediaItem({ id: 3, filename: 'show3.mp4', durationSeconds: 60 }),
+    ]
+    const repo = buildMockRepository(videos)
+    const config = buildMockConfig(
+      buildAppConfig({
+        session: { limitMinutes: 0 }, // Infinite
+      })
+    )
+
+    const engine = createEngine(config, repo)
+    await engine.startSession()
+
+    // Peek should show upcoming without consuming
+    const peeked = engine.peekQueue(5)
+    expect(peeked.length).toBeGreaterThan(0)
+
+    // getNextVideo should return the same first item
+    const next = await engine.getNextVideo()
+    expect(next).not.toBeNull()
+
+    // Peeking again should show updated queue
+    const peekedAfter = engine.peekQueue(5)
+    expect(peekedAfter.length).toBeGreaterThan(0)
+  })
 })

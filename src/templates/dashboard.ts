@@ -76,7 +76,7 @@ export function renderDashboard(): string {
                     hx-swap="none">
               Skip Limit Today
             </button>
-            <p class="off-air-reset">Limit resumes at <span id="reset-hour">6:00</span> AM</p>
+            <p class="off-air-reset">Limit resumes at <span id="reset-hour">6:00</span></p>
           </div>
         </div>
         

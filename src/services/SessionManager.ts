@@ -81,9 +81,15 @@ export class SessionManager {
       currentHour >= resetHour ? todayDate : this.getPreviousDate(todayDate)
 
     if (this.lastResetDate !== quotaDate) {
+      // Only reset skip flag on ACTUAL day change, not first initialization
+      const isActualDayChange = this.lastResetDate !== ''
+
       this.minutesWatchedToday = 0
       this.lastResetDate = quotaDate
-      this.quotaSkippedForToday = false // Reset skip flag on new quota day
+
+      if (isActualDayChange) {
+        this.quotaSkippedForToday = false // Reset skip flag on new quota day
+      }
     }
   }
 

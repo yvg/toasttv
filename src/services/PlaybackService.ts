@@ -54,6 +54,7 @@ export class PlaybackService {
     limitMinutes: number
     resetHour: number
     elapsedMs: number
+    remainingMs: number
   } {
     return this.engine.sessionInfo
   }
@@ -86,7 +87,36 @@ export class PlaybackService {
       const firstVideo = await this.engine.startSession()
       if (firstVideo) {
         await this.playVideo(firstVideo)
+
+        // Broadcast session start for dashboard refresh
+        this.events?.broadcast({
+          type: 'sessionStart',
+          sessionRemainingMs: this.engine.sessionInfo.remainingMs,
+          queue: this.peekQueue(10).map((v) => ({
+            id: v.id,
+            filename: v.filename,
+            isInterlude: v.isInterlude,
+          })),
+        })
+
+        // Pre-queue second video for gapless playback
+        const secondVideo = this.engine.peekQueue(1)[0]
+        if (secondVideo) {
+          await this.vlc.enqueue(secondVideo.path)
+          logger.info(`Pre-queued: ${secondVideo.filename}`)
+        }
       }
+    } else {
+      // If just expired but not yet in off-air loop (rare race), ensure we continue
+      this.events?.broadcast({
+        type: 'sessionStart',
+        sessionRemainingMs: this.engine.sessionInfo.remainingMs,
+        queue: this.peekQueue(10).map((v) => ({
+          id: v.id,
+          filename: v.filename,
+          isInterlude: v.isInterlude,
+        })),
+      })
     }
   }
 
@@ -127,6 +157,13 @@ export class PlaybackService {
 
     if (firstVideo) {
       await this.playVideo(firstVideo)
+
+      // PRE-QUEUE: Immediately enqueue the next video for gapless playback
+      const secondVideo = this.engine.peekQueue(1)[0]
+      if (secondVideo) {
+        await this.vlc.enqueue(secondVideo.path)
+        logger.info(`Pre-queued: ${secondVideo.filename}`)
+      }
     }
   }
 
@@ -331,10 +368,15 @@ export class PlaybackService {
   }
 
   /**
-   * Main playback loop - monitors VLC and advances to next video
+   * Main playback loop - monitors VLC and handles track transitions.
+   * This is a "Sync Loop" that detects when VLC auto-advances to the next
+   * queued video, then immediately enqueues the following video to maintain
+   * a seamless playback buffer.
    */
   private async runPlaybackLoop(): Promise<void> {
-    let stoppedCount = 0
+    // Track state for transition detection
+    let lastKnownFile: string | null = null
+    let lastPosition = 0
 
     while (this.running) {
       // In off-air mode, just keep looping (VLC handles the loop)
@@ -344,7 +386,7 @@ export class PlaybackService {
       }
 
       if (!this.engine.isSessionActive) {
-        stoppedCount = 0
+        lastKnownFile = null
         await Bun.sleep(1000)
         continue
       }
@@ -352,29 +394,99 @@ export class PlaybackService {
       try {
         const status = await this.vlc.getStatus()
 
-        // Video finished = not playing and we expected something to be playing
-        const isFinished = !status.isPlaying && this.currentVideo !== null
+        // Calculate dynamic "late in video" threshold based on actual video duration
+        const expectedDuration = this.currentVideo?.durationSeconds ?? 30
+        const lateThreshold = Math.max(expectedDuration * 0.5, 3) // At least 50% through OR 3s minimum
 
-        if (isFinished) {
-          stoppedCount++
-          logger.debug('Loop', `stopped count=${stoppedCount}`)
+        // Detect track transition by comparing positions.
+        // A real transition = position went from "late" to "early" (position reset)
+        // OR: VLC position exceeds our expected duration (VLC auto-advanced)
+        const wasLateInVideo = lastPosition > lateThreshold
+        const nowEarlyInVideo = status.positionSeconds < 3
+        const positionReset =
+          wasLateInVideo && nowEarlyInVideo && status.isPlaying
 
-          // Wait for 2 consecutive checks to avoid brief pauses
-          if (stoppedCount >= 2) {
-            logger.debug('Loop', 'advancing to next video')
-            const next = await this.engine.getNextVideo()
-            if (next) {
-              await this.playVideo(next)
-              stoppedCount = 0
+        // Also detect when VLC jumps beyond our expected video (it moved to next)
+        const vlcBeyondExpected =
+          status.positionSeconds > expectedDuration + 5 && status.isPlaying
+
+        const wasPlaying = this.currentVideo !== null
+
+        // If VLC stopped entirely (not playing, nothing enqueued), session may be over
+        if (!status.isPlaying && wasPlaying && lastPosition > 3) {
+          // Wait a moment to confirm VLC truly stopped (not just buffering between tracks)
+          await Bun.sleep(800)
+          const recheck = await this.vlc.getStatus()
+          if (!recheck.isPlaying) {
+            // VLC has stopped - session complete
+            logger.info('VLC stopped, session complete, entering off-air mode')
+            await this.enterOffAirMode()
+            lastKnownFile = null
+            lastPosition = 0
+            continue
+          }
+        }
+
+        // Transition detection: position reset OR VLC beyond expected
+        if ((positionReset || vlcBeyondExpected) && status.isPlaying) {
+          logger.debug(
+            'Loop',
+            `Track transition detected (reset=${positionReset}, beyond=${vlcBeyondExpected})`
+          )
+
+          // Advance our internal state
+          const next = await this.engine.getNextVideo()
+
+          if (next) {
+            // Update internal state to match VLC
+            this.currentVideo = next
+            lastKnownFile = next.filename
+            lastPosition = status.positionSeconds // Reset position tracking
+
+            // Broadcast track change
+            const queue = this.peekQueue(10).map((v) => ({
+              id: v.id,
+              filename: v.filename,
+              isInterlude: v.isInterlude,
+            }))
+            this.events?.broadcast({
+              type: 'trackStart',
+              trackId: next.id,
+              filename: next.filename,
+              duration: next.durationSeconds,
+              queue,
+            })
+
+            // PRE-QUEUE: Immediately enqueue the following video
+            const upcoming = this.engine.peekQueue(1)[0]
+            if (upcoming) {
+              await this.vlc.enqueue(upcoming.path)
+              logger.info(`Pre-queued: ${upcoming.filename}`)
             } else {
-              // Session complete - enter off-air mode
-              logger.info('Session complete, entering off-air mode')
-              await this.enterOffAirMode()
-              stoppedCount = 0
+              // No more videos - enqueue off-air if available
+              const appConfig = await this.config.get()
+              if (appConfig.session.offAirAssetId) {
+                const offAirMedia = await this.media.getById(
+                  appConfig.session.offAirAssetId
+                )
+                if (offAirMedia) {
+                  await this.vlc.enqueue(offAirMedia.path)
+                  logger.info(`Pre-queued off-air: ${offAirMedia.filename}`)
+                }
+              }
             }
+          } else {
+            // No next video - enter off-air mode
+            logger.info('Session complete, entering off-air mode')
+            await this.enterOffAirMode()
+            lastKnownFile = null
           }
         } else {
-          stoppedCount = 0
+          // No transition - just update tracking
+          lastPosition = status.positionSeconds
+          if (this.currentVideo) {
+            lastKnownFile = this.currentVideo.filename
+          }
         }
       } catch (error) {
         logger.error('Playback loop error:', error)

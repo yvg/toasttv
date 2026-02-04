@@ -70,6 +70,7 @@ export class PlaylistEngine {
     limitMinutes: number
     resetHour: number
     elapsedMs: number
+    remainingMs: number
   } {
     const info = this.session.getInfo()
     return {
@@ -77,6 +78,7 @@ export class PlaylistEngine {
       limitMinutes: info.limitMinutes,
       resetHour: info.resetHour,
       elapsedMs: info.elapsedMs,
+      remainingMs: info.remainingMs,
     }
   }
 
@@ -92,6 +94,8 @@ export class PlaylistEngine {
 
   skipQuotaForToday(): void {
     this.session.skipQuotaForToday()
+    // If queue was already marked complete due to limit, reopen it
+    this.queueState.isQueueComplete = false
   }
 
   /**
@@ -219,8 +223,12 @@ export class PlaylistEngine {
       // STOP CONDITIONS
 
       // 1. Finite Session Limit Reached?
+      // If quota is skipped for today, treat as infinite session
+      const isEffectivelyInfinite =
+        this.session.isQuotaSkipped || this.cachedConfig.limitMinutes === 0
       const limitSeconds = this.cachedConfig.limitMinutes * 60
-      if (this.cachedConfig.limitMinutes > 0 && queueDuration >= limitSeconds) {
+
+      if (!isEffectivelyInfinite && queueDuration >= limitSeconds) {
         // We reached the limit!
         // Append Outro if configured
         if (this.cachedConfig.outroVideoId) {
