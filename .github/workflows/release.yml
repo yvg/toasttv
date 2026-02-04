@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Install production dependencies
+        run: bun install --production
+      
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Create release tarball
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          
+          # Create clean directory for tarball contents
+          mkdir -p release/toasttv
+          
+          # Copy only what's needed for production
+          cp -r src release/toasttv/
+          cp -r public release/toasttv/
+          cp -r node_modules release/toasttv/
+          cp package.json release/toasttv/
+          cp bun.lock release/toasttv/
+          cp LICENSE release/toasttv/
+          cp README.md release/toasttv/
+          
+          # Create tarball
+          cd release
+          tar -czf toasttv-${VERSION}.tar.gz toasttv
+          
+          # Show contents for verification
+          echo "Tarball contents:"
+          tar -tzf toasttv-${VERSION}.tar.gz | head -20
+          
+          # Show size
+          ls -lh toasttv-${VERSION}.tar.gz
+      
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/toasttv-*.tar.gz
+          generate_release_notes: true
