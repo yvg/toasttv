@@ -8,16 +8,18 @@ import { Hono } from 'hono'
 import { html } from 'hono/html'
 import type { MediaService } from '../services/MediaService'
 import type { ConfigService } from '../services/ConfigService'
+import type { PlaylistEngine } from '../services/PlaylistEngine'
 import { renderLibrary, renderLibraryContent } from '../templates/library'
 import type { MediaType } from '../types'
 
 interface LibraryControllerDeps {
   config: ConfigService
   media: MediaService
+  playlist: PlaylistEngine
 }
 
 export function createLibraryController(deps: LibraryControllerDeps) {
-  const { config, media } = deps
+  const { config, media, playlist } = deps
   const controller = new Hono()
 
   // Helper to parse library query params
@@ -75,18 +77,18 @@ export function createLibraryController(deps: LibraryControllerDeps) {
   // Rescan media - returns updated library content (or just toast if from settings)
   controller.post('/api/rescan', async (c) => {
     const count = await media.rescan()
+    await playlist.refreshCache() // Update playlist with new media
     const body = await c.req.parseBody()
-    
+
     // If no view param, called from Settings - just return toast
     if (!body['view']) {
       return c.html(`<div class="toast success">Scanned ${count} files</div>`)
     }
-    
+
     const allMedia = await media.getAll()
     const appConfig = await config.get()
     const view = (body['view'] as 'list' | 'grid') ?? 'list'
-    const filter =
-      (body['filter'] as 'all' | 'videos' | 'interludes') ?? 'all'
+    const filter = (body['filter'] as 'all' | 'videos' | 'interludes') ?? 'all'
     const search = (body['search'] as string) ?? ''
 
     void media.generateThumbnails()
@@ -112,8 +114,7 @@ export function createLibraryController(deps: LibraryControllerDeps) {
     const body = await c.req.parseBody({ all: true })
     const files = body['files']
     const view = (body['view'] as 'list' | 'grid') ?? 'list'
-    const filter =
-      (body['filter'] as 'all' | 'videos' | 'interludes') ?? 'all'
+    const filter = (body['filter'] as 'all' | 'videos' | 'interludes') ?? 'all'
     const search = (body['search'] as string) ?? ''
 
     if (!files) {
@@ -192,27 +193,21 @@ export function createLibraryController(deps: LibraryControllerDeps) {
     const mediaType = body['type'] as MediaType
     if (!Number.isNaN(id) && mediaType) {
       let message = ''
-      
-      // Handle Intro/Outro setting logic
+
+      // Handle Intro/Outro/Off-Air setting logic
       if (mediaType === 'intro') {
         await config.update({ session: { introVideoId: id } })
-        // Clear media_type if previously something else, to avoid double badges?
-        // Actually, we rely on media_type for grid filtering? Not exactly.
-        // We'll update type to 'video' in DB so it doesn't get confused, 
-        // OR we can rely on UI to prioritize ID check.
-        // Let's reset type to video/interlude in DB if it was something else, 
-        // to keep DB clean, OR allow 'intro' type to persist but just use ID.
-        // Plan says: "Update settings.intro_video_id instead of modifying media_type"
-        // So we do NOT call media.updateType('intro').
-        // But we might need to reset 'outro' if it was outro?
         message = 'Set as Intro'
       } else if (mediaType === 'outro') {
         await config.update({ session: { outroVideoId: id } })
         message = 'Set as Outro'
+      } else if (mediaType === 'offair') {
+        await config.update({ session: { offAirAssetId: id } })
+        message = 'Set as Off-Air Screen'
       } else {
         // Video/Interlude
         await media.updateType(id, mediaType)
-        
+
         // If it WAS intro/outro, we might need to clear that config?
         const currentConfig = await config.get()
         if (currentConfig.session.introVideoId === id) {
@@ -221,7 +216,11 @@ export function createLibraryController(deps: LibraryControllerDeps) {
         if (currentConfig.session.outroVideoId === id) {
           await config.update({ session: { outroVideoId: null } })
         }
-        message = mediaType === 'interlude' ? 'Marked as Interlude' : 'Marked as Video'
+        if (currentConfig.session.offAirAssetId === id) {
+          await config.update({ session: { offAirAssetId: null } })
+        }
+        message =
+          mediaType === 'interlude' ? 'Marked as Interlude' : 'Marked as Video'
       }
 
       // We need to re-render the badge which OOB swaps
@@ -230,6 +229,7 @@ export function createLibraryController(deps: LibraryControllerDeps) {
         interlude: '🎬 Interlude',
         intro: '🌅 Intro Video',
         outro: '👋 Outro Video',
+        offair: '🌙 Off-Air Screen',
       }
 
       const typeIcons: Record<MediaType, string> = {
@@ -237,15 +237,16 @@ export function createLibraryController(deps: LibraryControllerDeps) {
         interlude: '🎬',
         intro: '🌅',
         outro: '👋',
+        offair: '🌙',
       }
-      
+
       // Determine what to show in badge
       // We know what we just set it to.
       // Ideally we would fetch the fresh state and re-render the badge properly.
-      
-      // Since template logic is complex (it checks both ID and Type), 
+
+      // Since template logic is complex (it checks both ID and Type),
       // let's assume successful update.
-      
+
       return c.html(`
         <div class="toast success">${message}</div>
         <span id="badge-${id}" class="media-type-badge" hx-swap-oob="true">${typeIcons[mediaType]}</span>

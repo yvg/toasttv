@@ -116,6 +116,87 @@
   color: var(--text-secondary);
 }
 
+/* --- Broadcast Essentials --- */
+.broadcast-essentials {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.broadcast-essentials h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.broadcast-slots {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.broadcast-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  min-width: 140px;
+}
+
+.broadcast-slot-icon {
+  font-size: 1rem;
+}
+
+.broadcast-slot-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.broadcast-slot-name {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.broadcast-slot-empty {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}
+
+/* Slot colors using vibrant palette */
+.slot-intro {
+  border-left-color: var(--toast-yellow);
+}
+.slot-outro {
+  border-left-color: var(--toast-purple);
+}
+.slot-offair {
+  border-left-color: var(--toast-teal);
+}
+
+@media (max-width: 600px) {
+  .broadcast-slots {
+    flex-direction: column;
+  }
+  .broadcast-slot {
+    min-width: 100%;
+  }
+}
+
 /* --- Media List View --- */
 .media-list {
   display: flex;
@@ -141,6 +222,22 @@
 
 .interlude-item {
   border-left: 3px solid var(--accent-secondary);
+}
+
+/* Special item type borders - using vibrant 90s palette with bolder styling */
+.intro-item {
+  border-left: 4px solid var(--toast-yellow);
+  background: rgba(255, 217, 61, 0.12);
+}
+
+.outro-item {
+  border-left: 4px solid var(--toast-purple);
+  background: rgba(155, 89, 182, 0.12);
+}
+
+.offair-item {
+  border-left: 4px solid var(--toast-teal);
+  background: rgba(0, 206, 201, 0.12);
 }
 
 .media-item-dates {
@@ -336,6 +433,19 @@
 
 .interlude-card {
   border: 2px solid var(--accent-secondary);
+}
+
+/* Special card type borders - using vibrant 90s palette */
+.intro-card {
+  border: 2px solid var(--toast-yellow);
+}
+
+.outro-card {
+  border: 2px solid var(--toast-purple);
+}
+
+.offair-card {
+  border: 2px solid var(--toast-teal);
 }
 
 .media-card-thumb {

@@ -6,12 +6,10 @@
  */
 
 import type { AppConfig } from '../repositories/ConfigRepository'
-import type { MediaItem } from '../types'
 import { renderLayout } from './layout'
 
 export interface SettingsProps {
   config: AppConfig
-  media: MediaItem[]
   mediaDirectory: string
 }
 
@@ -60,17 +58,25 @@ export function renderSettings(props: SettingsProps): string {
             </div>
             
             <div class="form-group">
-              <label for="sessionLimit">Session Duration (minutes)</label>
+              <label for="sessionLimit">Daily Limit (minutes)</label>
               <input type="number" 
                      id="sessionLimit" 
                      name="sessionLimit" 
                      value="${config.session.limitMinutes || ''}"
                      min="1"
                      placeholder="Unlimited">
-              <span class="hint">Leave empty for unlimited</span>
+              <span class="hint">Leave empty for unlimited daily watch time</span>
             </div>
             
-            <p class="card-note">💡 Set intro/outro videos in <a href="/library">Library</a></p>
+            <div class="form-group">
+              <label for="resetHour">New Day Starts At</label>
+              <select id="resetHour" name="resetHour">
+                ${renderHourOptions(config.session.resetHour)}
+              </select>
+              <span class="hint">Quota resets at this hour each day</span>
+            </div>
+            
+            <p class="card-note">💡 Set intro, outro, and off-air screens in <a href="/library">Library</a></p>
           </section>
           
           <!-- Interlude Settings Card -->
@@ -162,6 +168,20 @@ export function renderSettings(props: SettingsProps): string {
     </script>
   `
   )
+}
+
+function renderHourOptions(selectedHour: number): string {
+  return Array.from({ length: 24 }, (_, h) => {
+    const label =
+      h === 0
+        ? '12:00 AM'
+        : h < 12
+          ? `${h}:00 AM`
+          : h === 12
+            ? '12:00 PM'
+            : `${h - 12}:00 PM`
+    return `<option value="${h}" ${selectedHour === h ? 'selected' : ''}>${label}</option>`
+  }).join('')
 }
 
 function renderLogoUpload(hasLogo: boolean): string {

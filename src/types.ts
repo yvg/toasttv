@@ -7,7 +7,7 @@
 
 // --- Media Types ---
 
-export type MediaType = 'video' | 'interlude' | 'intro' | 'outro'
+export type MediaType = 'video' | 'interlude' | 'intro' | 'outro' | 'offair'
 
 export interface MediaItem {
   readonly id: number
@@ -78,11 +78,16 @@ export interface IVlcController {
   stop(): Promise<void>
   next(): Promise<void>
   enqueue(path: string): Promise<void>
+  setLoop(enabled: boolean): Promise<void>
   getStatus(): Promise<PlaybackStatus>
 }
 
 export interface IFileSystem {
-  listFiles(directory: string, extensions: readonly string[], excludePaths?: string[]): string[]
+  listFiles(
+    directory: string,
+    extensions: readonly string[],
+    excludePaths?: string[]
+  ): string[]
   exists(path: string): boolean
 }
 

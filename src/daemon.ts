@@ -13,8 +13,12 @@ import { FFProbeClient } from './clients/FilesystemClient'
 import { VlcClient } from './clients/VlcClient'
 import { CECClient, CEC_KEYS } from './clients/CECClient'
 import { MediaIndexer } from './services/MediaIndexer'
-import { PlaylistEngine, SystemDateTimeProvider } from './services/PlaylistEngine'
+import {
+  PlaylistEngine,
+  SystemDateTimeProvider,
+} from './services/PlaylistEngine'
 import { SessionManager } from './services/SessionManager'
+import { ConfigService } from './services/ConfigService'
 import { type MediaItem, type ToastTVConfig } from './types'
 
 export class ToastTVDaemon {
@@ -94,10 +98,10 @@ export class ToastTVDaemon {
     const vlcConfig = {
       ...runtimeConfig.vlc,
       reconnectDelayMs: 2000,
-      maxReconnectAttempts: 10
+      maxReconnectAttempts: 10,
     }
     this.vlc = new VlcClient(vlcConfig)
-    
+
     const filesystem = new FilesystemClient()
     const mediaProbe = new FFProbeClient()
 
@@ -105,13 +109,13 @@ export class ToastTVDaemon {
     const mediaConfig = {
       directory: bootstrap.paths.media,
       supportedExtensions: ['.mp4', '.mkv', '.avi', '.mov', '.webm'],
-      databasePath: bootstrap.paths.database
+      databasePath: bootstrap.paths.database,
     }
 
     // Default interlude directory to 'interludes' inside media directory if not specified
     const interludeConfig = {
       ...runtimeConfig.interlude,
-      directory: path.join(bootstrap.paths.media, 'interludes')
+      directory: path.join(bootstrap.paths.media, 'interludes'),
     }
 
     this.indexer = new MediaIndexer(
@@ -131,11 +135,17 @@ export class ToastTVDaemon {
 
     // 4. Run Scan & Connect
     await this.indexer.scanAll()
+
+    // 5. Auto-discover special media (intro/outro/offair) via ConfigService
+    const configService = new ConfigService(this.appConfig)
+    const allMedia = await this.repository.getAll()
+    await configService.discoverSpecialMedia(allMedia)
+
     await this.vlc.connect()
 
     // Apply logo settings
     if (runtimeConfig.logo.enabled && runtimeConfig.logo.imagePath) {
-      // Use fire-and-forget or await, but catch error if VLC not ready? 
+      // Use fire-and-forget or await, but catch error if VLC not ready?
       // VlcClient.connect() should ensure it's ready.
       try {
         await this.vlc.setLogo(
@@ -210,14 +220,18 @@ export class ToastTVDaemon {
 
     if (this.vlc) {
       try {
-        await this.vlc.stop() 
-      } catch (e) { /* ignore */ }
-      
+        await this.vlc.stop()
+      } catch (e) {
+        /* ignore */
+      }
+
       try {
         await this.vlc.disconnect()
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
     }
-    
+
     if (this.repository) {
       await this.repository.close()
     }

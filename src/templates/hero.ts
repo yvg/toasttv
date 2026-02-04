@@ -12,56 +12,89 @@ export interface HeroProps {
 }
 
 export function renderDashboardHero(props: HeroProps): string {
-    if (!props.sessionInfo.startedAt) {
-        return renderTvOff()
-    }
-    return renderTvOn(props)
+  if (!props.sessionInfo.startedAt) {
+    return renderTvOff()
+  }
+  return renderTvOn(props)
 }
 
 function renderTvOff(): string {
   return `
-    <div class="tv-off-state" style="text-align: center; padding: 4rem 2rem;">
-        <div class="static-noise" style="width: 100px; height: 100px; background: repeating-radial-gradient(#000 0 0.0001%, #222 0 0.0002%); margin: 0 auto 2rem; border-radius: 50%; box-shadow: 0 0 20px rgba(255,255,255,0.1);"></div>
-        <h1 style="font-size: 2.5rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 2px;">TV OFF</h1>
-        <p style="color: var(--text-secondary); margin-bottom: 2rem;">System is in standby mode.</p>
+    <div class="tv-off-state">
+        <!-- SMPTE Color Bars -->
+        <div class="smpte-bars">
+            <div class="smpte-row smpte-main">
+                <div style="background: #c0c0c0; flex: 1;"></div>
+                <div style="background: #c0c000; flex: 1;"></div>
+                <div style="background: #00c0c0; flex: 1;"></div>
+                <div style="background: #00c000; flex: 1;"></div>
+                <div style="background: #c000c0; flex: 1;"></div>
+                <div style="background: #c00000; flex: 1;"></div>
+                <div style="background: #0000c0; flex: 1;"></div>
+            </div>
+            <div class="smpte-row smpte-mid">
+                <div style="background: #0000c0; flex: 1;"></div>
+                <div style="background: #131313; flex: 1;"></div>
+                <div style="background: #c000c0; flex: 1;"></div>
+                <div style="background: #131313; flex: 1;"></div>
+                <div style="background: #00c0c0; flex: 1;"></div>
+                <div style="background: #131313; flex: 1;"></div>
+                <div style="background: #c0c0c0; flex: 1;"></div>
+            </div>
+            <div class="smpte-row smpte-bottom">
+                <div style="background: #00214c; flex: 1.5;"></div>
+                <div style="background: #fff; flex: 1.5;"></div>
+                <div style="background: #32006a; flex: 1.5;"></div>
+                <div style="background: #131313; flex: 4;"></div>
+                <div style="background: #090909; flex: 0.5;"></div>
+                <div style="background: #1d1d1d; flex: 0.5;"></div>
+            </div>
+            <!-- Overlay with text -->
+            <div class="smpte-overlay"></div>
+        </div>
         
-        <button class="btn btn-primary" style="font-size: 1.5rem; padding: 1rem 3rem; background: var(--nick-green); color: black; border: 3px solid black; box-shadow: 6px 6px 0 rgba(0,0,0,0.5);"
-                hx-post="/api/session/start"
-                hx-swap="none">
-            ⏻ POWER ON
-        </button>
+        <div class="tv-off-content">
+            <button class="btn btn-primary hero-btn-power" style="font-size: 1.25rem; padding: 0.875rem 2rem;"
+                    hx-post="/api/session/start"
+                    hx-swap="none">
+                ⏻ POWER ON
+            </button>
+        </div>
     </div>
   `
 }
 
 function renderTvOn(props: HeroProps): string {
-    const { currentVideo, queue, sessionInfo } = props
-    
-    // Default status when VLC is not responding
-    const status = props.status ?? {
-      isPlaying: false,
-      currentFile: null,
-      positionSeconds: 0,
-      durationSeconds: 0
-    }
-    
-    // Calculate session progress
-    const limitMs = sessionInfo.limitMinutes * 60 * 1000
-    const progressPercent = limitMs > 0 ? Math.min(100, (sessionInfo.elapsedMs / limitMs) * 100) : 0
-    const remainingMs = Math.max(0, limitMs - sessionInfo.elapsedMs)
-    
-    // Format remaining time as MM:SS
-    const remainingMins = Math.floor(remainingMs / 1000 / 60)
-    const remainingSecs = Math.floor((remainingMs / 1000) % 60)
-    const remainingFormatted = `${remainingMins}:${remainingSecs.toString().padStart(2, '0')}`
-    
-    // For critical status
-    const remainingTotalMins = Math.ceil(remainingMs / 1000 / 60)
+  const { currentVideo, queue, sessionInfo } = props
 
-    return `
+  // Default status when VLC is not responding
+  const status = props.status ?? {
+    isPlaying: false,
+    currentFile: null,
+    positionSeconds: 0,
+    durationSeconds: 0,
+  }
+
+  // Calculate session progress
+  const limitMs = sessionInfo.limitMinutes * 60 * 1000
+  const progressPercent =
+    limitMs > 0 ? Math.min(100, (sessionInfo.elapsedMs / limitMs) * 100) : 0
+  const remainingMs = Math.max(0, limitMs - sessionInfo.elapsedMs)
+
+  // Format remaining time as MM:SS
+  const remainingMins = Math.floor(remainingMs / 1000 / 60)
+  const remainingSecs = Math.floor((remainingMs / 1000) % 60)
+  const remainingFormatted = `${remainingMins}:${remainingSecs.toString().padStart(2, '0')}`
+
+  // For critical status
+  const remainingTotalMins = Math.ceil(remainingMs / 1000 / 60)
+
+  return `
     <div class="now-playing-hero">
         <!-- Session Timer Top Bar with client-side countdown -->
-        ${limitMs > 0 ? `
+        ${
+          limitMs > 0
+            ? `
             <div class="session-bar ${remainingTotalMins < 5 ? 'critical' : remainingTotalMins < 10 ? 'warning' : ''}" data-limit-minutes="${sessionInfo.limitMinutes}">
                 <div class="session-bar-fill" style="width: ${progressPercent}%"></div>
                 <div class="session-bar-content">
@@ -73,7 +106,9 @@ function renderTvOn(props: HeroProps): string {
                     </span>
                 </div>
             </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- Main TV Content -->
         <div class="tv-preview">
@@ -83,9 +118,16 @@ function renderTvOn(props: HeroProps): string {
             </div>
             
             <div class="tv-content">
-                ${currentVideo ? `
+                ${
+                  currentVideo
+                    ? `
                     <h2 class="tv-title">${currentVideo.filename}</h2>
-                    <div class="tv-progress">
+                    <div class="tv-progress" 
+                         data-track-id="${currentVideo.id}"
+                         data-position="${status.positionSeconds}"
+                         data-duration="${currentVideo.durationSeconds}"
+                         data-playing="${status.isPlaying}"
+                         data-server-time="${Date.now()}">
                         <div class="tv-progress-bar">
                             <div class="tv-progress-fill" style="width: ${Math.min(100, (status.positionSeconds / currentVideo.durationSeconds) * 100)}%"></div>
                         </div>
@@ -93,16 +135,19 @@ function renderTvOn(props: HeroProps): string {
                             ${formatTime(status.positionSeconds)} / ${formatTime(currentVideo.durationSeconds)}
                         </div>
                     </div>
-                ` : `
+                `
+                    : `
                    <span class="tv-ready-count">📺</span>
                    <span class="tv-ready-prompt">Tuning in...</span>
-                `}
+                `
+                }
             </div>
         </div>
 
         <!-- Controls -->
         <div class="hero-controls">
-            ${status.isPlaying 
+            ${
+              status.isPlaying
                 ? `<button class="hero-btn" hx-post="/api/pause" hx-swap="none" title="Pause">
                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                    </button>`
@@ -141,9 +186,9 @@ function renderTvOn(props: HeroProps): string {
 }
 
 function renderUpNextRail(queue: MediaItem[]): string {
-    if (queue.length === 0) return ''
+  if (queue.length === 0) return ''
 
-    return `
+  return `
     <div class="up-next">
         <details open>
             <summary class="up-next-summary">
@@ -153,7 +198,9 @@ function renderUpNextRail(queue: MediaItem[]): string {
             </summary>
             
             <div class="up-next-list">
-                ${queue.map((item, index) => `
+                ${queue
+                  .map(
+                    (item, index) => `
                     <div class="up-next-item ${item.isInterlude ? 'interlude' : ''}">
                         <div class="up-next-thumb">
                             <img src="/thumbnails/${item.id}.jpg" 
@@ -165,7 +212,9 @@ function renderUpNextRail(queue: MediaItem[]): string {
                         <div class="up-next-item-title">${item.filename}</div>
                         <div class="up-next-item-duration">${formatTime(item.durationSeconds)}</div>
                     </div>
-                `).join('')}
+                `
+                  )
+                  .join('')}
             </div>
         </details>
     </div>

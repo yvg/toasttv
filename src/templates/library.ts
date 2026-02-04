@@ -50,6 +50,25 @@ export function renderLibraryContent(props: LibraryProps): string {
     )
   }
 
+  // Sort special items (intro, outro, offair) to top
+  if (config) {
+    const specialIds = new Set(
+      [
+        config.session.introVideoId,
+        config.session.outroVideoId,
+        config.session.offAirAssetId,
+      ].filter((id): id is number => id !== null)
+    )
+
+    filteredMedia = [...filteredMedia].sort((a, b) => {
+      const aSpecial = specialIds.has(a.id)
+      const bSpecial = specialIds.has(b.id)
+      if (aSpecial && !bSpecial) return -1
+      if (!aSpecial && bSpecial) return 1
+      return 0
+    })
+  }
+
   const videos = filteredMedia.filter((m) => !m.isInterlude)
   const interludes = filteredMedia.filter((m) => m.isInterlude)
 
@@ -64,7 +83,13 @@ export function renderLibraryContent(props: LibraryProps): string {
   } else if (filter === 'videos') {
     mediaContent = renderMediaSection('Videos', '📺', videos, view, config)
   } else {
-    mediaContent = renderMediaSection('Interludes', '🎬', interludes, view, config)
+    mediaContent = renderMediaSection(
+      'Interludes',
+      '🎬',
+      interludes,
+      view,
+      config
+    )
   }
 
   return `
@@ -87,10 +112,14 @@ export function renderLibraryContent(props: LibraryProps): string {
                  hx-include="[name='view'],[name='filter']">
           <input type="hidden" name="view" value="${view}">
           <input type="hidden" name="filter" value="${filter}">
-          ${search ? `<button type="button" class="search-clear" 
+          ${
+            search
+              ? `<button type="button" class="search-clear" 
                               hx-get="/partials/library?view=${view}&filter=${filter}" 
                               hx-target="#library-content" 
-                              hx-swap="outerHTML">×</button>` : ''}
+                              hx-swap="outerHTML">×</button>`
+              : ''
+          }
         </div>
         
         <div class="filter-buttons"
@@ -147,13 +176,15 @@ export function renderLibraryContent(props: LibraryProps): string {
       </div>
 
       <div id="media-container">
-        ${filteredMedia.length === 0 
-          ? `<div class="empty-state">
+        ${
+          filteredMedia.length === 0
+            ? `<div class="empty-state">
                <span class="empty-icon">📺</span>
                <p>No videos yet</p>
                <p class="empty-hint">Drop files above or add to <code>${mediaDirectory}</code></p>
              </div>`
-          : mediaContent}
+            : mediaContent
+        }
       </div>
     </div>
   `
@@ -163,20 +194,42 @@ export function renderLibraryContent(props: LibraryProps): string {
  * Render a single media item.
  * Exported for OOB swap updates.
  */
-export function renderMediaItem(item: MediaItem, view: 'list' | 'grid', config?: AppConfig): string {
+export function renderMediaItem(
+  item: MediaItem,
+  view: 'list' | 'grid',
+  config?: AppConfig
+): string {
   const status = getDateStatus(item)
   const thumbnailUrl = `/thumbnails/${item.id}.jpg`
-  
+
   // Determine effective media type for UI
   let displayType = item.mediaType
   if (config) {
     if (config.session.introVideoId === item.id) displayType = 'intro'
     else if (config.session.outroVideoId === item.id) displayType = 'outro'
+    else if (config.session.offAirAssetId === item.id) displayType = 'offair'
   }
+
+  // Get CSS class for special item types
+  const getItemClass = (type: MediaType): string => {
+    switch (type) {
+      case 'interlude':
+        return 'interlude'
+      case 'intro':
+        return 'intro'
+      case 'outro':
+        return 'outro'
+      case 'offair':
+        return 'offair'
+      default:
+        return ''
+    }
+  }
+  const itemClass = getItemClass(displayType)
 
   if (view === 'grid') {
     return `
-      <div class="media-card ${item.isInterlude ? 'interlude-card' : ''}" id="media-${item.id}">
+      <div class="media-card ${itemClass ? `${itemClass}-card` : ''}" id="media-${item.id}">
         <div class="media-card-thumb" style="background-image: url('${thumbnailUrl}')">
           <span class="media-card-duration">${formatTime(item.durationSeconds)}</span>
           ${status ? `<span class="status-pill ${status.class}">${status.label}</span>` : ''}
@@ -194,7 +247,7 @@ export function renderMediaItem(item: MediaItem, view: 'list' | 'grid', config?:
   }
 
   return `
-    <div class="media-item ${item.isInterlude ? 'interlude-item' : ''}" id="media-${item.id}">
+    <div class="media-item ${itemClass ? `${itemClass}-item` : ''}" id="media-${item.id}">
       <div class="media-item-main">
         <div class="media-thumb" style="background-image: url('${thumbnailUrl}')"></div>
         <span class="media-icon" id="badge-${item.id}">${MEDIA_TYPE_ICONS[displayType]}</span>
@@ -213,18 +266,21 @@ import { isSeasonalActive } from '../utils/date'
 
 // ... existing imports
 
-function getDateStatus(item: MediaItem): { label: string; class: string } | null {
+function getDateStatus(
+  item: MediaItem
+): { label: string; class: string } | null {
   if (!item.isInterlude) return null
-  
-  if (!item.dateStart && !item.dateEnd) return { label: 'Always', class: 'active' }
-  
+
+  if (!item.dateStart && !item.dateEnd)
+    return { label: 'Always', class: 'active' }
+
   if (item.dateStart && item.dateEnd) {
     if (isSeasonalActive(item.dateStart, item.dateEnd)) {
       return { label: 'Active', class: 'active' }
     }
     return { label: 'Inactive', class: 'expired' } // Renamed from Expired
   }
-  
+
   return { label: 'Partial', class: 'scheduled' }
 }
 
@@ -233,6 +289,7 @@ const MEDIA_TYPE_ICONS: Record<MediaType, string> = {
   interlude: '🎬',
   intro: '🌅',
   outro: '👋',
+  offair: '🌙',
 }
 
 function renderTypeSelect(item: MediaItem, displayType: MediaType): string {
@@ -249,6 +306,7 @@ function renderTypeSelect(item: MediaItem, displayType: MediaType): string {
       <option value="interlude" ${displayType === 'interlude' ? 'selected' : ''}>🎬 Interlude</option>
       <option value="intro" ${displayType === 'intro' ? 'selected' : ''}>🌅 Intro</option>
       <option value="outro" ${displayType === 'outro' ? 'selected' : ''}>👋 Outro</option>
+      <option value="offair" ${displayType === 'offair' ? 'selected' : ''}>🌙 Off-Air</option>
     </select>
   `
 }
@@ -265,7 +323,10 @@ function renderDeleteButton(item: MediaItem): string {
   `
 }
 
-export function renderDatePicker(item: MediaItem, displayType: MediaType = item.mediaType): string {
+export function renderDatePicker(
+  item: MediaItem,
+  displayType: MediaType = item.mediaType
+): string {
   if (displayType !== 'interlude') return ''
 
   return `
@@ -278,18 +339,20 @@ export function renderDatePicker(item: MediaItem, displayType: MediaType = item.
              class="date-input-compact" 
              name="dateStart"
              value="${item.dateStart ?? ''}" 
-             placeholder="MM-DD"
+             placeholder="DD-MM"
              pattern="\\d{2}-\\d{2}"
-             title="Format: MM-DD (e.g. 12-01)">
+             title="Format: DD-MM (e.g. 01-12)">
       <span class="date-separator">→</span>
       <input type="text" 
              class="date-input-compact" 
              name="dateEnd"
              value="${item.dateEnd ?? ''}" 
-             placeholder="MM-DD"
+             placeholder="DD-MM"
              pattern="\\d{2}-\\d{2}"
-             title="Format: MM-DD (e.g. 02-28)">
-      ${item.dateStart || item.dateEnd ? `
+             title="Format: DD-MM (e.g. 28-02)">
+      ${
+        item.dateStart || item.dateEnd
+          ? `
         <button type="button" class="btn-clear-date"
                 hx-post="/api/update-dates/${item.id}"
                 hx-vals='{"dateStart": "", "dateEnd": ""}'
@@ -298,7 +361,9 @@ export function renderDatePicker(item: MediaItem, displayType: MediaType = item.
                 title="Clear Schedule">
           ✕
         </button>
-      ` : ''}
+      `
+          : ''
+      }
     </form>
   `
 }

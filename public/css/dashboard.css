@@ -27,6 +27,128 @@
   flex-direction: column;
 }
 
+/* --- TV Off / SMPTE Color Bars --- */
+.tv-off-state {
+  display: flex;
+  flex-direction: column;
+}
+
+.smpte-bars {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+}
+
+.smpte-row {
+  display: flex;
+  width: 100%;
+}
+
+.smpte-main {
+  flex: 7;
+}
+
+.smpte-mid {
+  flex: 1;
+}
+
+.smpte-bottom {
+  flex: 2;
+}
+
+.smpte-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.smpte-logo {
+  width: 80px;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+.tv-off-content {
+  padding: 1.5rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* --- Off-Air Card (Quota Exhausted) --- */
+.off-air-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 206, 201, 0.15) 0%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
+  border-left: 4px solid var(--toast-teal);
+  text-align: center;
+}
+
+.off-air-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.off-air-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--toast-teal);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.off-air-message {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.off-air-loop {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.off-air-btn {
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--toast-teal);
+  color: #000;
+  border: 2px solid #000;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
+}
+
+.off-air-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.off-air-reset {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+}
+
 /* --- Session Timer Bar --- */
 .session-bar {
   position: relative;

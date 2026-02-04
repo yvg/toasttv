@@ -24,12 +24,12 @@ export function createSettingsController(deps: SettingsControllerDeps) {
 
   controller.get('/settings', async (c) => {
     const currentConfig = await config.get()
-    const allMedia = await media.getAll()
-    return c.html(renderSettings({ 
-      config: currentConfig, 
-      media: allMedia,
-      mediaDirectory: media.getMediaDirectory()
-    }))
+    return c.html(
+      renderSettings({
+        config: currentConfig,
+        mediaDirectory: media.getMediaDirectory(),
+      })
+    )
   })
 
   // --- API Endpoints ---
@@ -45,12 +45,16 @@ export function createSettingsController(deps: SettingsControllerDeps) {
 
     // Parse form fields into config structure
     const sessionLimit = body['sessionLimit'] as string
+    const resetHour = body['resetHour'] as string
+
     const partial: DeepPartial<AppConfig> = {
       server: {
         port: parseInt(body['serverPort'] as string, 10) || 1993,
       },
       session: {
         limitMinutes: sessionLimit ? parseInt(sessionLimit, 10) : 0,
+        resetHour: parseInt(resetHour, 10) || 6,
+        // offAirAssetId is set via Library page, not Settings
       },
       interlude: {
         enabled: body['interludeEnabled'] === 'true',

@@ -41,5 +41,13 @@ export function createPlaybackController(deps: PlaybackControllerDeps) {
     return c.html(html`<div class="toast warning">Session stopped</div>`)
   })
 
+  // Skip daily quota and resume normal playback
+  controller.post('/api/skip-quota', async (c) => {
+    await playback.skipQuotaAndResume()
+    return c.html(
+      html`<div class="toast success">Quota skipped for today</div>`
+    )
+  })
+
   return controller
 }

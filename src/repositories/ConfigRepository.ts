@@ -21,6 +21,8 @@ export interface AppConfig {
   }
   session: {
     limitMinutes: number
+    resetHour: number
+    offAirAssetId: number | null
     introVideoId: number | null
     outroVideoId: number | null
   }
@@ -57,6 +59,8 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   session: {
     limitMinutes: 30,
+    resetHour: 6,
+    offAirAssetId: null,
     introVideoId: null,
     outroVideoId: null,
   },
@@ -97,9 +101,15 @@ export class ConfigRepository {
         const parsed = JSON.parse(raw)
         return {
           paths: {
-            media: parsed.media?.directory ?? parsed.paths?.media ?? DEFAULT_BOOTSTRAP.paths.media,
-            database: parsed.media?.databasePath ?? parsed.paths?.database ?? DEFAULT_BOOTSTRAP.paths.database
-          }
+            media:
+              parsed.media?.directory ??
+              parsed.paths?.media ??
+              DEFAULT_BOOTSTRAP.paths.media,
+            database:
+              parsed.media?.databasePath ??
+              parsed.paths?.database ??
+              DEFAULT_BOOTSTRAP.paths.database,
+          },
         }
       }
     } catch (error) {
@@ -117,7 +127,7 @@ export class ConfigRepository {
     if (!this.repository) return
 
     const settings = await this.repository.getAllSettings()
-    
+
     // Helper to set if missing
     const setIfMissing = async (key: string, value: string) => {
       if (!settings[key]) {
@@ -126,9 +136,18 @@ export class ConfigRepository {
     }
 
     await setIfMissing('server.port', DEFAULT_CONFIG.server.port.toString())
-    await setIfMissing('session.limitMinutes', DEFAULT_CONFIG.session.limitMinutes.toString())
-    await setIfMissing('interlude.enabled', DEFAULT_CONFIG.interlude.enabled.toString())
-    await setIfMissing('interlude.frequency', DEFAULT_CONFIG.interlude.frequency.toString())
+    await setIfMissing(
+      'session.limitMinutes',
+      DEFAULT_CONFIG.session.limitMinutes.toString()
+    )
+    await setIfMissing(
+      'interlude.enabled',
+      DEFAULT_CONFIG.interlude.enabled.toString()
+    )
+    await setIfMissing(
+      'interlude.frequency',
+      DEFAULT_CONFIG.interlude.frequency.toString()
+    )
     await setIfMissing('vlc.host', DEFAULT_CONFIG.vlc.host)
     await setIfMissing('vlc.port', DEFAULT_CONFIG.vlc.port.toString())
     await setIfMissing('logo.enabled', DEFAULT_CONFIG.logo.enabled.toString())
@@ -137,87 +156,129 @@ export class ConfigRepository {
     if (DEFAULT_CONFIG.logo.imagePath) {
       await setIfMissing('logo.imagePath', DEFAULT_CONFIG.logo.imagePath)
     }
-
-    // Auto-discover intro/outro if not set
-    if (!settings['session.introVideoId']) {
-      await this.discoverAndSetIntro()
-    }
-  }
-
-  private async discoverAndSetIntro(): Promise<void> {
-    if (!this.repository) return
-    // Look for penny_..._intro.mp4
-    const allMedia = await this.repository.getAll()
-    const intro = allMedia.find(m => m.filename.includes('_intro') || m.filename.includes('penny_and_chip_splash'))
-    if (intro) {
-      await this.repository.setSetting('session.introVideoId', intro.id.toString())
-      console.log(`Auto-configured intro video: ${intro.filename}`)
-    }
-    
-    const outro = allMedia.find(m => m.filename.includes('_outro'))
-    if (outro) {
-      await this.repository.setSetting('session.outroVideoId', outro.id.toString())
-      console.log(`Auto-configured outro video: ${outro.filename}`)
-    }
+    // Note: Special media discovery (intro/outro/offair) is now handled by ConfigService.discoverSpecialMedia()
   }
 
   async get(): Promise<AppConfig> {
     if (!this.repository) return DEFAULT_CONFIG
-    
+
     const s = await this.repository.getAllSettings()
 
     return {
       server: {
-        port: parseInt(s['server.port'] ?? '1993', 10)
+        port: parseInt(s['server.port'] ?? '1993', 10),
       },
       session: {
         limitMinutes: parseInt(s['session.limitMinutes'] ?? '30', 10),
-        introVideoId: s['session.introVideoId'] ? parseInt(s['session.introVideoId'], 10) : null,
-        outroVideoId: s['session.outroVideoId'] ? parseInt(s['session.outroVideoId'], 10) : null,
+        resetHour: parseInt(s['session.resetHour'] ?? '6', 10),
+        offAirAssetId: s['session.offAirAssetId']
+          ? parseInt(s['session.offAirAssetId'], 10)
+          : null,
+        introVideoId: s['session.introVideoId']
+          ? parseInt(s['session.introVideoId'], 10)
+          : null,
+        outroVideoId: s['session.outroVideoId']
+          ? parseInt(s['session.outroVideoId'], 10)
+          : null,
       },
       interlude: {
         enabled: s['interlude.enabled'] === 'true',
-        frequency: parseInt(s['interlude.frequency'] ?? '1', 10)
+        frequency: parseInt(s['interlude.frequency'] ?? '1', 10),
       },
       vlc: {
         host: s['vlc.host'] ?? 'localhost',
-        port: parseInt(s['vlc.port'] ?? '9999', 10)
+        port: parseInt(s['vlc.port'] ?? '9999', 10),
       },
       logo: {
         enabled: s['logo.enabled'] === 'true',
         imagePath: s['logo.imagePath'] ?? null,
         opacity: parseInt(s['logo.opacity'] ?? '128', 10),
-        position: parseInt(s['logo.position'] ?? '2', 10)
-      }
+        position: parseInt(s['logo.position'] ?? '2', 10),
+      },
     }
   }
 
   async update(partial: DeepPartial<AppConfig>): Promise<void> {
     if (!this.repository) return
 
-    if (partial.server?.port !== undefined) await this.repository.setSetting('server.port', partial.server.port.toString())
-    
+    if (partial.server?.port !== undefined)
+      await this.repository.setSetting(
+        'server.port',
+        partial.server.port.toString()
+      )
+
     if (partial.session) {
-      if (partial.session.limitMinutes !== undefined) await this.repository.setSetting('session.limitMinutes', partial.session.limitMinutes.toString())
-      if (partial.session.introVideoId !== undefined) await this.repository.setSetting('session.introVideoId', partial.session.introVideoId?.toString() ?? '')
-      if (partial.session.outroVideoId !== undefined) await this.repository.setSetting('session.outroVideoId', partial.session.outroVideoId?.toString() ?? '')
+      if (partial.session.limitMinutes !== undefined)
+        await this.repository.setSetting(
+          'session.limitMinutes',
+          partial.session.limitMinutes.toString()
+        )
+      if (partial.session.resetHour !== undefined)
+        await this.repository.setSetting(
+          'session.resetHour',
+          partial.session.resetHour.toString()
+        )
+      if (partial.session.offAirAssetId !== undefined)
+        await this.repository.setSetting(
+          'session.offAirAssetId',
+          partial.session.offAirAssetId?.toString() ?? ''
+        )
+      if (partial.session.introVideoId !== undefined)
+        await this.repository.setSetting(
+          'session.introVideoId',
+          partial.session.introVideoId?.toString() ?? ''
+        )
+      if (partial.session.outroVideoId !== undefined)
+        await this.repository.setSetting(
+          'session.outroVideoId',
+          partial.session.outroVideoId?.toString() ?? ''
+        )
     }
 
     if (partial.interlude) {
-      if (partial.interlude.enabled !== undefined) await this.repository.setSetting('interlude.enabled', partial.interlude.enabled.toString())
-      if (partial.interlude.frequency !== undefined) await this.repository.setSetting('interlude.frequency', partial.interlude.frequency.toString())
+      if (partial.interlude.enabled !== undefined)
+        await this.repository.setSetting(
+          'interlude.enabled',
+          partial.interlude.enabled.toString()
+        )
+      if (partial.interlude.frequency !== undefined)
+        await this.repository.setSetting(
+          'interlude.frequency',
+          partial.interlude.frequency.toString()
+        )
     }
 
     if (partial.vlc) {
-      if (partial.vlc.host !== undefined) await this.repository.setSetting('vlc.host', partial.vlc.host)
-      if (partial.vlc.port !== undefined) await this.repository.setSetting('vlc.port', partial.vlc.port.toString())
+      if (partial.vlc.host !== undefined)
+        await this.repository.setSetting('vlc.host', partial.vlc.host)
+      if (partial.vlc.port !== undefined)
+        await this.repository.setSetting(
+          'vlc.port',
+          partial.vlc.port.toString()
+        )
     }
 
     if (partial.logo) {
-      if (partial.logo.enabled !== undefined) await this.repository.setSetting('logo.enabled', partial.logo.enabled.toString())
-      if (partial.logo.imagePath !== undefined) await this.repository.setSetting('logo.imagePath', partial.logo.imagePath ?? '')
-      if (partial.logo.opacity !== undefined) await this.repository.setSetting('logo.opacity', partial.logo.opacity.toString())
-      if (partial.logo.position !== undefined) await this.repository.setSetting('logo.position', partial.logo.position.toString())
+      if (partial.logo.enabled !== undefined)
+        await this.repository.setSetting(
+          'logo.enabled',
+          partial.logo.enabled.toString()
+        )
+      if (partial.logo.imagePath !== undefined)
+        await this.repository.setSetting(
+          'logo.imagePath',
+          partial.logo.imagePath ?? ''
+        )
+      if (partial.logo.opacity !== undefined)
+        await this.repository.setSetting(
+          'logo.opacity',
+          partial.logo.opacity.toString()
+        )
+      if (partial.logo.position !== undefined)
+        await this.repository.setSetting(
+          'logo.position',
+          partial.logo.position.toString()
+        )
     }
   }
 }

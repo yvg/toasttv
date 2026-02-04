@@ -12,11 +12,13 @@ import { renderDashboard } from './templates/dashboard'
 import { ConfigService } from './services/ConfigService'
 import { MediaService } from './services/MediaService'
 import { PlaybackService } from './services/PlaybackService'
+import { DashboardEventService } from './services/DashboardEventService'
 import { ThumbnailClient } from './clients/ThumbnailClient'
 import { createPlaybackController } from './controllers/PlaybackController'
 import { createLibraryController } from './controllers/LibraryController'
 import { createSettingsController } from './controllers/SettingsController'
 import { createDashboardController } from './controllers/DashboardController'
+import { EventsController } from './controllers/EventsController'
 
 export interface ServerResult {
   app: Hono
@@ -29,18 +31,22 @@ export function createServer(daemon: ToastTVDaemon): ServerResult {
   // --- Create Services ---
   const configService = new ConfigService(daemon.getConfigManager())
   const thumbnailClient = new ThumbnailClient()
-  
+  const dashboardEventService = new DashboardEventService()
+
   const mediaService = new MediaService(
     daemon.getRepository(),
     daemon.getIndexer(),
     configService,
     thumbnailClient
   )
-  
-  const playbackService = new PlaybackService(
-    daemon.getVlc(),
-    daemon.getEngine()
-  )
+
+  const playbackService = new PlaybackService({
+    vlc: daemon.getVlc(),
+    engine: daemon.getEngine(),
+    config: configService,
+    media: daemon.getRepository(),
+    events: dashboardEventService,
+  })
 
   // --- Mount Static Files ---
   app.use('/*', serveStatic({ root: './public' }))
@@ -55,6 +61,7 @@ export function createServer(daemon: ToastTVDaemon): ServerResult {
   const libraryController = createLibraryController({
     config: configService,
     media: mediaService,
+    playlist: daemon.getEngine(),
   })
 
   const settingsController = createSettingsController({
@@ -64,14 +71,22 @@ export function createServer(daemon: ToastTVDaemon): ServerResult {
 
   const dashboardController = createDashboardController({
     playback: playbackService,
-    media: mediaService
+    media: mediaService,
   })
+
+  const eventsController = new EventsController(
+    playbackService,
+    dashboardEventService
+  )
 
   // Mount all controllers at root
   app.route('/', playbackController)
   app.route('/', libraryController)
   app.route('/', settingsController)
   app.route('/', dashboardController)
+
+  // SSE endpoint for real-time dashboard updates
+  app.get('/events/dashboard', (c) => eventsController.handleDashboardSSE(c))
 
   // --- Dashboard (home page) ---
   app.get('/', (c) => {

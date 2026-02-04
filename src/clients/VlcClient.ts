@@ -121,6 +121,12 @@ export class VlcClient implements IVlcController {
     await this.sendCommand('next')
   }
 
+  async setLoop(enabled: boolean): Promise<void> {
+    // VLC RC uses 'loop on/off' to enable/disable loop mode
+    await this.sendCommand(enabled ? 'loop on' : 'loop off')
+    console.log(`Loop ${enabled ? 'enabled' : 'disabled'}`)
+  }
+
   async getStatus(): Promise<PlaybackStatus> {
     // VLC's RC interface can be flaky. We send commands one at a time
     // and parse only the first numeric value from each response.

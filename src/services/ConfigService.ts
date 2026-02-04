@@ -1,16 +1,18 @@
 /**
  * Config Service
- * 
+ *
  * Business logic layer for application configuration.
  * Wraps ConfigRepository to maintain proper layer separation.
  */
 
-import type { ConfigRepository, AppConfig, DeepPartial } from '../repositories/ConfigRepository'
+import type {
+  ConfigRepository,
+  AppConfig,
+  DeepPartial,
+} from '../repositories/ConfigRepository'
 
 export class ConfigService {
-  constructor(
-    private readonly repository: ConfigRepository
-  ) {}
+  constructor(private readonly repository: ConfigRepository) {}
 
   /**
    * Get current application configuration.
@@ -44,16 +46,20 @@ export class ConfigService {
       throw new Error('Interlude frequency must be at least 1')
     }
     await this.repository.update({
-      interlude: { enabled, frequency }
+      interlude: { enabled, frequency },
     })
   }
 
   /**
    * Set logo configuration.
    */
-  async setLogoConfig(imagePath: string, opacity: number, position: number): Promise<void> {
+  async setLogoConfig(
+    imagePath: string,
+    opacity: number,
+    position: number
+  ): Promise<void> {
     await this.repository.update({
-      logo: { imagePath, opacity, position, enabled: true }
+      logo: { imagePath, opacity, position, enabled: true },
     })
   }
 
@@ -76,5 +82,47 @@ export class ConfigService {
    */
   getDatabasePath(): string {
     return this.repository.getBootstrap().paths.database
+  }
+
+  /**
+   * Auto-discover special media (intro/outro/off-air) by filename patterns.
+   * This is business logic that belongs in the service layer.
+   * Called during app initialization after media indexing.
+   */
+  async discoverSpecialMedia(
+    allMedia: Array<{ id: number; filename: string }>
+  ): Promise<void> {
+    const currentConfig = await this.get()
+
+    // Intro - look for _intro or penny_and_chip_splash
+    if (!currentConfig.session.introVideoId) {
+      const intro = allMedia.find(
+        (m) =>
+          m.filename.includes('_intro') ||
+          m.filename.includes('penny_and_chip_splash')
+      )
+      if (intro) {
+        await this.repository.update({ session: { introVideoId: intro.id } })
+        console.log(`Auto-configured intro video: ${intro.filename}`)
+      }
+    }
+
+    // Outro - look for _outro
+    if (!currentConfig.session.outroVideoId) {
+      const outro = allMedia.find((m) => m.filename.includes('_outro'))
+      if (outro) {
+        await this.repository.update({ session: { outroVideoId: outro.id } })
+        console.log(`Auto-configured outro video: ${outro.filename}`)
+      }
+    }
+
+    // Off-air screen - look for bedtime
+    if (!currentConfig.session.offAirAssetId) {
+      const offair = allMedia.find((m) => m.filename.includes('bedtime'))
+      if (offair) {
+        await this.repository.update({ session: { offAirAssetId: offair.id } })
+        console.log(`Auto-configured off-air screen: ${offair.filename}`)
+      }
+    }
   }
 }

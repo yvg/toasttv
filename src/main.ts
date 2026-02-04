@@ -6,7 +6,6 @@
 
 import { ToastTVDaemon } from './daemon'
 import { createServer } from './server'
-import { defaultConfig } from './types'
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 1993
 
@@ -40,6 +39,7 @@ async function main(): Promise<void> {
     Bun.serve({
       port: PORT,
       fetch: app.fetch,
+      idleTimeout: 0, // Disable timeout for SSE connections
     })
 
     // Run playback loop in background (owned by PlaybackService)
