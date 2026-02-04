@@ -2,223 +2,143 @@
  * Unit tests for MediaIndexer
  */
 
-import { describe, expect, mock, test } from 'bun:test'
+import { describe, expect, test, beforeEach } from 'bun:test'
+import { mock, type MockProxy } from 'jest-mock-extended'
 import { MediaIndexer } from '../src/services/MediaIndexer'
 import type { IMediaRepository } from '../src/repositories/IMediaRepository'
 import type {
   IFileSystem,
   IMediaProbe,
-  InterludeConfig,
   MediaConfig,
+  InterludeConfig,
 } from '../src/types'
 
-// --- Builder Functions ---
+describe('MediaIndexer', () => {
+  let repo: MockProxy<IMediaRepository>
+  let fs: MockProxy<IFileSystem>
+  let probe: MockProxy<IMediaProbe>
+  let indexer: MediaIndexer
 
-function buildMediaConfig(overrides: Partial<MediaConfig> = {}): MediaConfig {
-  return {
+  const mediaConfig: MediaConfig = {
     directory: '/media/videos',
     supportedExtensions: ['.mp4', '.mkv'],
     databasePath: ':memory:',
-    ...overrides,
   }
-}
 
-function buildInterludeConfig(
-  overrides: Partial<InterludeConfig> = {}
-): InterludeConfig {
-  return {
+  const interludeConfig: InterludeConfig = {
     enabled: true,
     frequency: 2,
     directory: '/media/interludes',
-    ...overrides,
   }
-}
 
-/**
- * Creates a mock IMediaRepository with all required methods.
- * Pass overrides to customize specific method behaviors.
- */
-function buildMockRepo(
-  overrides: Partial<IMediaRepository> = {}
-): IMediaRepository {
-  return {
-    initialize: mock(() => Promise.resolve()),
-    close: mock(() => Promise.resolve()),
-    getAll: mock(() => Promise.resolve([])),
-    getById: mock(() => Promise.resolve(null)),
-    getAllVideos: mock(() => Promise.resolve([])),
-    getInterludes: mock(() => Promise.resolve([])),
-    getByType: mock(() => Promise.resolve(null)),
-    upsertMedia: mock(() => Promise.resolve()),
-    deleteMedia: mock(() => Promise.resolve()),
-    toggleInterlude: mock(() => Promise.resolve()),
-    updateMediaType: mock(() => Promise.resolve()),
-    resetMediaType: mock(() => Promise.resolve()),
-    updateDates: mock(() => Promise.resolve()),
-    removeNotInPaths: mock(() => Promise.resolve(0)),
-    getSetting: mock(() => Promise.resolve(null)),
-    setSetting: mock(() => Promise.resolve()),
-    getAllSettings: mock(() => Promise.resolve({})),
-    ...overrides,
-  }
-}
+  beforeEach(() => {
+    repo = mock<IMediaRepository>()
+    fs = mock<IFileSystem>()
+    probe = mock<IMediaProbe>()
 
-// --- Tests ---
+    // Default mocks
+    repo.upsertMedia.mockResolvedValue()
+    repo.removeNotInPaths.mockResolvedValue(0)
+    fs.exists.mockReturnValue(true)
+    fs.listFiles.mockReturnValue([]) // Default to empty list
+    probe.getDuration.mockResolvedValue(60)
 
-describe('MediaIndexer', () => {
+    indexer = new MediaIndexer(mediaConfig, interludeConfig, repo, fs, probe)
+  })
+
   test('scanAll indexes videos and interludes', async () => {
-    const upsertedItems: unknown[] = []
+    // Setup file listing with simpler matchers
+    // We can check calls later, just set return values for now if specific matchers fail
+    fs.listFiles
+      .mockReturnValueOnce([
+        '/media/videos/show1.mp4',
+        '/media/videos/show2.mp4',
+      ])
+      .mockReturnValueOnce(['/media/interludes/bump.mp4'])
 
-    const mockRepo = buildMockRepo({
-      upsertMedia: mock((item) => {
-        upsertedItems.push(item)
-        return Promise.resolve()
-      }),
-    })
-
-    const mockFs: IFileSystem = {
-      exists: mock(() => true),
-      listFiles: mock((dir: string) => {
-        if (dir.includes('interludes')) {
-          return ['/media/interludes/bump.mp4']
-        }
-        return ['/media/videos/show1.mp4', '/media/videos/show2.mp4']
-      }),
-    }
-
-    const mockProbe: IMediaProbe = {
-      getDuration: mock(() => Promise.resolve(1200)),
-    }
-
-    const indexer = new MediaIndexer(
-      buildMediaConfig(),
-      buildInterludeConfig(),
-      mockRepo,
-      mockFs,
-      mockProbe
-    )
+    probe.getDuration.mockResolvedValue(1200)
 
     const result = await indexer.scanAll()
 
     expect(result).toBe(3) // 2 videos + 1 interlude
-    expect(upsertedItems.length).toBe(3)
+    expect(repo.upsertMedia).toHaveBeenCalledTimes(3)
+    // Verify video call
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'show1.mp4',
+        mediaType: 'video',
+        isInterlude: false,
+      })
+    )
+    // Verify interlude call
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'bump.mp4',
+        mediaType: 'interlude',
+        isInterlude: true,
+      })
+    )
   })
 
   test('scanAll handles missing directory', async () => {
-    const mockRepo = buildMockRepo()
-
-    const mockFs: IFileSystem = {
-      exists: mock(() => false),
-      listFiles: mock(() => []),
-    }
-
-    const mockProbe: IMediaProbe = {
-      getDuration: mock(() => Promise.resolve(0)),
-    }
-
-    const indexer = new MediaIndexer(
-      buildMediaConfig(),
-      buildInterludeConfig(),
-      mockRepo,
-      mockFs,
-      mockProbe
-    )
+    fs.exists.calledWith(mediaConfig.directory).mockReturnValue(false)
+    // fs.listFiles default is [] which is fine
 
     const result = await indexer.scanAll()
 
     expect(result).toBe(0)
+    expect(repo.upsertMedia).not.toHaveBeenCalled()
   })
 
   test('scanAll marks interludes correctly', async () => {
-    const upsertedItems: Array<{ isInterlude: boolean; filename: string }> = []
-
-    const mockRepo = buildMockRepo({
-      upsertMedia: mock((item) => {
-        upsertedItems.push(item as { isInterlude: boolean; filename: string })
-        return Promise.resolve()
-      }),
-    })
-
-    const mockFs: IFileSystem = {
-      exists: mock(() => true),
-      listFiles: mock((dir: string, _ext: unknown, exclude?: string[]) => {
-        if (dir.includes('interludes')) {
-          return ['/media/interludes/bump.mp4']
-        }
-        // Imitate exclusion logic slightly to verify it passes checks
-        if (exclude && exclude.some(p => '/media/videos/show.mp4'.startsWith(p))) {
-            return []
-        }
-        return ['/media/videos/show.mp4']
-      }),
-    }
-
-    const mockProbe: IMediaProbe = {
-      getDuration: mock(() => Promise.resolve(60)),
-    }
-
-    const indexer = new MediaIndexer(
-      buildMediaConfig(),
-      buildInterludeConfig(),
-      mockRepo,
-      mockFs,
-      mockProbe
-    )
+    fs.listFiles
+      .mockReturnValueOnce(['/media/videos/show.mp4'])
+      .mockReturnValueOnce(['/media/interludes/bump.mp4'])
 
     await indexer.scanAll()
 
-    const video = upsertedItems.find((i) => i.filename === 'show.mp4')
-    const interlude = upsertedItems.find((i) => i.filename === 'bump.mp4')
-
-    expect(interlude?.isInterlude).toBe(true)
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'show.mp4',
+        isInterlude: false,
+      })
+    )
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'bump.mp4',
+        isInterlude: true,
+      })
+    )
   })
 
   test('scanAll detects seasonal dates from filenames', async () => {
-    const upsertedItems: any[] = []
-
-    const mockRepo = buildMockRepo({
-      upsertMedia: mock((item) => {
-        upsertedItems.push(item)
-        return Promise.resolve()
-      }),
-    })
-
-    const mockFs: IFileSystem = {
-      exists: mock(() => true),
-      listFiles: mock((dir: string, _ext: unknown, excludePaths?: string[]) => {
-          // Identify if we are scanning videos or interludes based on the dir string
-          // In the real code, indexer calls scanDirectory twice.
-          // 1. Videos (exclude interludes)
-          // 2. Interludes
-          
-          if (dir.includes('interludes')) {
-              return ['/media/interludes/penny_xmas.mp4', '/media/interludes/penny_summer.mp4']
-          }
-           return []
-      }),
-    }
-
-    const mockProbe: IMediaProbe = {
-      getDuration: mock(() => Promise.resolve(60)),
-    }
-
-    const indexer = new MediaIndexer(
-      buildMediaConfig(),
-      buildInterludeConfig(),
-      mockRepo,
-      mockFs,
-      mockProbe
-    )
+    // First call is video dir -> empty
+    // Second call is interlude dir -> files
+    fs.listFiles
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([
+        '/media/interludes/penny_xmas.mp4',
+        '/media/interludes/penny_summer.mp4',
+      ])
 
     await indexer.scanAll()
 
-    const xmas = upsertedItems.find((i) => i.filename === 'penny_xmas.mp4')
-    const summer = upsertedItems.find((i) => i.filename === 'penny_summer.mp4')
+    // Verify Xmas
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'penny_xmas.mp4',
+        dateStart: '12-01',
+        dateEnd: '12-26',
+      })
+    )
 
-    expect(xmas.dateStart).toBe('12-01')
-    expect(xmas.dateEnd).toBe('12-26')
-    
-    expect(summer.dateStart).toBe('06-01')
-    expect(summer.dateEnd).toBe('08-31')
+    // Verify Summer
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'penny_summer.mp4',
+        dateStart: '06-01',
+        dateEnd: '08-31',
+      })
+    )
   })
 })
