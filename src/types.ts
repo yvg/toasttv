@@ -99,34 +99,3 @@ export interface IDateTimeProvider {
   now(): Date
   today(): string // YYYY-MM-DD
 }
-
-// --- Default Config ---
-
-export const defaultConfig: ToastTVConfig = {
-  vlc: {
-    host: 'localhost',
-    port: 9999,
-    reconnectDelayMs: 2000,
-    maxReconnectAttempts: 10,
-  },
-  media: {
-    directory: '/media/videos',
-    supportedExtensions: ['.mp4', '.mkv', '.avi', '.webm'],
-    databasePath: '/var/lib/toasttv/media.db',
-  },
-  session: {
-    limitMinutes: 30,
-    introVideoId: null,
-    outroVideoId: null,
-  },
-  interlude: {
-    enabled: true,
-    frequency: 2,
-    directory: '/media/interludes',
-  },
-  logo: {
-    filePath: null,
-    opacity: 200,
-    position: 6,
-  },
-}

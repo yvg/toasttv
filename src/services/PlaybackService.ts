@@ -101,10 +101,10 @@ export class PlaybackService {
       return
     }
 
-    // Exit off-air mode if active and disable VLC loop
-    if (this.offAirMode) {
-      await this.vlc.setLoop(false)
-    }
+    // Ensure VLC loop is disabled for normal session
+    await this.vlc.setLoop(false)
+
+    // Exit off-air mode if active
     this.offAirMode = false
 
     const firstVideo = await this.engine.startSession()
@@ -282,6 +282,21 @@ export class PlaybackService {
     // Play with loop enabled
     await this.vlc.play(mediaItem.path)
     await this.vlc.setLoop(true)
+
+    // Broadcast off-air state to frontend
+    this.events?.broadcast({
+      type: 'sync',
+      sessionActive: false,
+      isOffAir: true,
+      resetHour: this.engine.sessionInfo.resetHour,
+      trackId: mediaItem.id,
+      filename: mediaItem.filename,
+      duration: mediaItem.durationSeconds,
+      position: 0,
+      isPlaying: true,
+      sessionRemainingMs: 0,
+      queue: [],
+    })
   }
 
   // --- Lifecycle ---

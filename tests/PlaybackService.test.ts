@@ -123,6 +123,7 @@ describe('PlaybackService', () => {
 
     expect(engine.startSession).toHaveBeenCalled()
     expect(vlc._playCalls).toContain('/media/show.mp4')
+    expect(vlc.setLoop).toHaveBeenCalledWith(false)
   })
 
   test('startSession() does nothing if already active', async () => {

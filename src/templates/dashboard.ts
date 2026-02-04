@@ -180,6 +180,7 @@ export function renderDashboard(): string {
       const sessionBar = document.getElementById('session-bar');
       const sessionFill = document.getElementById('session-fill');
       const sessionTime = document.getElementById('session-time');
+      const sessionLabel = document.querySelector('.session-label'); // Add selector for label
       const playPauseIcon = document.getElementById('play-pause-icon');
       const upNextSection = document.getElementById('up-next-section');
       const upNextTitle = document.getElementById('up-next-title');
@@ -396,6 +397,15 @@ export function renderDashboard(): string {
       }
       
       function updateSessionTimer() {
+        if (sessionRemainingMs <= 0) {
+          if (sessionLabel) sessionLabel.textContent = 'Broadcast';
+          sessionTime.textContent = 'Ending Soon';
+          sessionFill.style.width = '100%';
+          sessionBar.className = 'session-bar critical';
+          return;
+        }
+
+        if (sessionLabel) sessionLabel.textContent = 'Broadcast Ends In';
         const mins = Math.floor(sessionRemainingMs / 60000);
         const secs = Math.floor((sessionRemainingMs % 60000) / 1000);
         sessionTime.textContent = mins + ':' + secs.toString().padStart(2, '0');
