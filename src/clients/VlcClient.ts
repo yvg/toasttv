@@ -142,12 +142,17 @@ export class VlcClient implements IVlcController {
 
     // Parse state from 'status' command
     // Output format: ( state playing ) or ( state paused ) or ( state stop )
+    // And input: ( input: file:///... )
     const statusResponse = await this.sendCommand('status')
     let state: 'playing' | 'paused' | 'stopped' = 'stopped'
     if (statusResponse.includes('state playing')) state = 'playing'
     else if (statusResponse.includes('state paused')) state = 'paused'
 
     const isPlaying = state === 'playing'
+
+    // Extract current file path/URI
+    const inputMatch = statusResponse.match(/\( (?:new\s)?input: (.+) \)/)
+    const currentFile = inputMatch ? inputMatch[1] : null
 
     // get_time returns current position in seconds
     const positionResponse = await this.sendCommand('get_time')
@@ -165,7 +170,7 @@ export class VlcClient implements IVlcController {
     return {
       isPlaying,
       state,
-      currentFile: null, // We track this in PlaybackService
+      currentFile: currentFile || null,
       positionSeconds,
       durationSeconds,
     }

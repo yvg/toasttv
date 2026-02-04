@@ -158,13 +158,6 @@ export class PlaybackService {
 
     if (firstVideo) {
       await this.playVideo(firstVideo)
-
-      // PRE-QUEUE: Immediately enqueue the next video for gapless playback
-      const secondVideo = this.engine.peekQueue(1)[0]
-      if (secondVideo) {
-        await this.vlc.enqueue(secondVideo.path)
-        logger.info(`Pre-queued: ${secondVideo.filename}`)
-      }
     }
   }
 
@@ -291,6 +284,29 @@ export class PlaybackService {
       duration: video.durationSeconds,
       queue,
     })
+
+    // PRE-QUEUE NEXT
+    // When manually playing a video (start/skip), we must ensure the NEXT video is queued
+    // otherwise VLC will stop after this one.
+    const nextInQueue = this.engine.peekQueue(1)[0]
+    if (nextInQueue) {
+      await this.vlc.enqueue(nextInQueue.path)
+      logger.info(`Pre-queued (manual play): ${nextInQueue.filename}`)
+    } else {
+      // If no more videos, try to enqueue off-air loop?
+      const appConfig = await this.config.get()
+      if (appConfig.session.offAirAssetId) {
+        const offAirMedia = await this.media.getById(
+          appConfig.session.offAirAssetId
+        )
+        if (offAirMedia) {
+          await this.vlc.enqueue(offAirMedia.path)
+          logger.info(
+            `Pre-queued off-air (manual play): ${offAirMedia.filename}`
+          )
+        }
+      }
+    }
   }
 
   // NOTE: "Last video badge" feature removed - VLC 3.0 doesn't support runtime logo control
@@ -426,6 +442,15 @@ export class PlaybackService {
         const vlcBeyondExpected =
           status.positionSeconds > expectedDuration + 5 && status.isPlaying
 
+        // Detect manual track change via VLC UI (filename mismatch)
+        const vlcFileMismatch =
+          status.currentFile &&
+          this.currentVideo &&
+          status.isPlaying &&
+          !decodeURIComponent(status.currentFile).includes(
+            this.currentVideo.filename
+          )
+
         const wasPlaying = this.currentVideo !== null
 
         // If VLC stopped entirely (not playing, nothing enqueued), session may be over
@@ -447,11 +472,14 @@ export class PlaybackService {
           }
         }
 
-        // Transition detection: position reset OR VLC beyond expected
-        if ((positionReset || vlcBeyondExpected) && status.isPlaying) {
+        // Transition detection: position reset OR VLC beyond expected OR file mismatch
+        if (
+          (positionReset || vlcBeyondExpected || vlcFileMismatch) &&
+          status.isPlaying
+        ) {
           logger.debug(
             'Loop',
-            `Track transition detected (reset=${positionReset}, beyond=${vlcBeyondExpected})`
+            `Track transition detected (reset=${positionReset}, beyond=${vlcBeyondExpected}, mismatch=${vlcFileMismatch})`
           )
 
           // Advance our internal state
