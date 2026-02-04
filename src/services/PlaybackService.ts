@@ -381,6 +381,7 @@ export class PlaybackService {
     // Track state for transition detection
     let lastPosition = 0
     let disconnectedLogged = false
+    let lastIsPlaying = false
 
     while (this.running) {
       // In off-air mode, just keep looping (VLC handles the loop)
@@ -397,6 +398,17 @@ export class PlaybackService {
       try {
         const status = await this.vlc.getStatus()
         disconnectedLogged = false // Connection active
+
+        // Detect Pause/Resume changes
+        if (status.isPlaying !== lastIsPlaying) {
+          // If we have a current video, broadcast the state change
+          if (this.currentVideo) {
+            this.events?.broadcast({
+              type: status.isPlaying ? 'playing' : 'paused',
+            })
+          }
+          lastIsPlaying = status.isPlaying
+        }
 
         // Calculate dynamic "late in video" threshold based on actual video duration
         const expectedDuration = this.currentVideo?.durationSeconds ?? 30
@@ -417,11 +429,16 @@ export class PlaybackService {
         const wasPlaying = this.currentVideo !== null
 
         // If VLC stopped entirely (not playing, nothing enqueued), session may be over
-        if (!status.isPlaying && wasPlaying && lastPosition > 3) {
+        if (
+          !status.isPlaying &&
+          status.state !== 'paused' &&
+          wasPlaying &&
+          lastPosition > 3
+        ) {
           // Wait a moment to confirm VLC truly stopped (not just buffering between tracks)
           await Bun.sleep(800)
           const recheck = await this.vlc.getStatus()
-          if (!recheck.isPlaying) {
+          if (!recheck.isPlaying && recheck.state !== 'paused') {
             // VLC has stopped - session complete
             logger.info('VLC stopped, session complete, entering off-air mode')
             await this.enterOffAirMode()

@@ -240,6 +240,7 @@ export function renderDashboard(): string {
             handlePaused();
             break;
           case 'playing':
+          case 'resume': // Added 'resume' to trigger handlePlaying
             handlePlaying();
             break;
           case 'sessionStart':
@@ -288,8 +289,13 @@ export function renderDashboard(): string {
         handleQueueUpdate(event);
         
         // Start timers
-        if (isPlaying) startTimer();
-        startSessionTimer();
+        if (isPlaying) {
+          startTimer();
+          startSessionTimer();
+        } else {
+          stopTimer();
+          stopSessionTimer();
+        }
       }
       
       function handleTrackStart(event) {
@@ -312,12 +318,14 @@ export function renderDashboard(): string {
       function handlePaused() {
         isPlaying = false;
         stopTimer();
+        stopSessionTimer();
         updateStatusBadge();
       }
       
       function handlePlaying() {
         isPlaying = true;
         startTimer();
+        startSessionTimer();
         updateStatusBadge();
       }
       

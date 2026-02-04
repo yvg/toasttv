@@ -22,6 +22,7 @@ export interface MediaItem {
 
 export interface PlaybackStatus {
   readonly isPlaying: boolean
+  readonly state: 'playing' | 'paused' | 'stopped'
   readonly currentFile: string | null
   readonly positionSeconds: number
   readonly durationSeconds: number
