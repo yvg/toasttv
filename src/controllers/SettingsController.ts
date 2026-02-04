@@ -68,6 +68,12 @@ export function createSettingsController(deps: SettingsControllerDeps) {
         enabled: body['logoEnabled'] === 'true',
         opacity: parseInt(body['logoOpacity'] as string, 10) || 200,
         position: parseInt(body['logoPosition'] as string, 10) || 2,
+        x: Number.isNaN(parseInt(body['logoX'] as string, 10))
+          ? 8
+          : parseInt(body['logoX'] as string, 10),
+        y: Number.isNaN(parseInt(body['logoY'] as string, 10))
+          ? 8
+          : parseInt(body['logoY'] as string, 10),
       },
     }
 

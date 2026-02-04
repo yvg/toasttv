@@ -143,20 +143,8 @@ export class ToastTVDaemon {
 
     await this.vlc.connect()
 
-    // Apply logo settings
-    if (runtimeConfig.logo.enabled && runtimeConfig.logo.imagePath) {
-      // Use fire-and-forget or await, but catch error if VLC not ready?
-      // VlcClient.connect() should ensure it's ready.
-      try {
-        await this.vlc.setLogo(
-          runtimeConfig.logo.imagePath,
-          runtimeConfig.logo.opacity,
-          runtimeConfig.logo.position
-        )
-      } catch (err) {
-        console.warn('Failed to set initial logo:', err)
-      }
-    }
+    // NOTE: Logo settings are applied at VLC launch time via command-line args
+    // VLC 3.0's RC interface does not support runtime logo control
 
     // Try to start CEC listener (optional, may not be available on all systems)
     try {

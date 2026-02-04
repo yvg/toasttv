@@ -39,6 +39,8 @@ export interface AppConfig {
     imagePath: string | null
     opacity: number
     position: number
+    x: number
+    y: number
   }
 }
 
@@ -77,6 +79,8 @@ const DEFAULT_CONFIG: AppConfig = {
     imagePath: './data/logo.png',
     opacity: 128,
     position: 2,
+    x: 8,
+    y: 8,
   },
 }
 
@@ -153,6 +157,8 @@ export class ConfigRepository {
     await setIfMissing('logo.enabled', DEFAULT_CONFIG.logo.enabled.toString())
     await setIfMissing('logo.opacity', DEFAULT_CONFIG.logo.opacity.toString())
     await setIfMissing('logo.position', DEFAULT_CONFIG.logo.position.toString())
+    await setIfMissing('logo.x', DEFAULT_CONFIG.logo.x.toString())
+    await setIfMissing('logo.y', DEFAULT_CONFIG.logo.y.toString())
     if (DEFAULT_CONFIG.logo.imagePath) {
       await setIfMissing('logo.imagePath', DEFAULT_CONFIG.logo.imagePath)
     }
@@ -194,6 +200,8 @@ export class ConfigRepository {
         imagePath: s['logo.imagePath'] ?? null,
         opacity: parseInt(s['logo.opacity'] ?? '128', 10),
         position: parseInt(s['logo.position'] ?? '2', 10),
+        x: parseInt(s['logo.x'] ?? '8', 10),
+        y: parseInt(s['logo.y'] ?? '8', 10),
       },
     }
   }
@@ -279,6 +287,10 @@ export class ConfigRepository {
           'logo.position',
           partial.logo.position.toString()
         )
+      if (partial.logo.x !== undefined)
+        await this.repository.setSetting('logo.x', partial.logo.x.toString())
+      if (partial.logo.y !== undefined)
+        await this.repository.setSetting('logo.y', partial.logo.y.toString())
     }
   }
 }

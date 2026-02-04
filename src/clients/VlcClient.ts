@@ -168,41 +168,7 @@ export class VlcClient implements IVlcController {
   /**
    * Set logo overlay.
    * @param path Path to logo image file (PNG with transparency recommended)
-   * @param opacity 0-255
-   * @param position 0-8 (grid: 0=center, 1=left, 2=right, 4=top, 8=bottom, combinations for corners)
+   * @param opacity 0-255 (0 = fully opaque, 255 = fully transparent in VLC)
+   * @param position 0-8 (grid: 0=top-left, 2=top-right, 6=bottom-left, 8=bottom-right)
    */
-  async setLogo(
-    path: string,
-    opacity: number = 200,
-    position: number = 6
-  ): Promise<void> {
-    // VLC logo position mapping:
-    // 0=center, 1=left, 2=right, 4=top, 8=bottom
-    // Combinations: 5=top-left, 6=top-right, 9=bottom-left, 10=bottom-right
-    const positionMap: Record<number, number> = {
-      0: 5, // top-left
-      1: 4, // top-center
-      2: 6, // top-right
-      3: 1, // middle-left
-      4: 0, // center
-      5: 2, // middle-right
-      6: 9, // bottom-left
-      7: 8, // bottom-center
-      8: 10, // bottom-right
-    }
-
-    const vlcPosition = positionMap[position] ?? 6
-
-    await this.sendCommand(`logo-file ${path}`)
-    await this.sendCommand(`logo-opacity ${opacity}`)
-    await this.sendCommand(`logo-position ${vlcPosition}`)
-    console.log(
-      `Logo set: ${path} (opacity: ${opacity}, position: ${vlcPosition})`
-    )
-  }
-
-  async clearLogo(): Promise<void> {
-    await this.sendCommand('logo-file')
-    console.log('Logo cleared')
-  }
 }

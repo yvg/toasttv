@@ -54,6 +54,8 @@ function buildAppConfig(
       imagePath: null,
       opacity: 128,
       position: 2,
+      x: 8,
+      y: 8,
       ...overrides.logo,
     },
   }

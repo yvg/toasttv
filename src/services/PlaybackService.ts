@@ -292,6 +292,9 @@ export class PlaybackService {
     })
   }
 
+  // NOTE: "Last video badge" feature removed - VLC 3.0 doesn't support runtime logo control
+  // Revisit when VLC 4.0 is stable
+
   /**
    * Enter off-air mode - play the configured off-air asset on loop
    */
@@ -385,7 +388,6 @@ export class PlaybackService {
       }
 
       if (!this.engine.isSessionActive) {
-        lastKnownFile = null
         await Bun.sleep(1000)
         continue
       }
@@ -420,7 +422,6 @@ export class PlaybackService {
             // VLC has stopped - session complete
             logger.info('VLC stopped, session complete, entering off-air mode')
             await this.enterOffAirMode()
-            lastKnownFile = null
             lastPosition = 0
             continue
           }
@@ -439,7 +440,6 @@ export class PlaybackService {
           if (next) {
             // Update internal state to match VLC
             this.currentVideo = next
-            lastKnownFile = next.filename
             lastPosition = status.positionSeconds // Reset position tracking
 
             // Broadcast track change
@@ -478,14 +478,10 @@ export class PlaybackService {
             // No next video - enter off-air mode
             logger.info('Session complete, entering off-air mode')
             await this.enterOffAirMode()
-            lastKnownFile = null
           }
         } else {
           // No transition - just update tracking
           lastPosition = status.positionSeconds
-          if (this.currentVideo) {
-            lastKnownFile = this.currentVideo.filename
-          }
         }
       } catch (error) {
         logger.error('Playback loop error:', error)

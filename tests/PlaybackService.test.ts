@@ -39,6 +39,7 @@ describe('PlaybackService', () => {
       enqueue: mock(() => Promise.resolve()),
       clear: mock(() => Promise.resolve()),
       setLoop: mock(() => Promise.resolve()),
+
       getStatus: mock(() =>
         Promise.resolve({
           isPlaying: true,

@@ -56,7 +56,8 @@ vlc:
 		echo "VLC already running"; \
 	else \
 		echo "Starting VLC with RC interface..."; \
-		$(VLC) --extraintf rc --rc-host localhost:9999 &>/dev/null & \
+		LOGO_ARGS=$$($(BUN) scripts/vlc-logo-args.ts); \
+		$(VLC) --extraintf rc --rc-host localhost:9999 $$LOGO_ARGS &>/dev/null & \
 		sleep 1; \
 	fi
 

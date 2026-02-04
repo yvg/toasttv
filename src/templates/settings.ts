@@ -30,7 +30,10 @@ export function renderSettings(props: SettingsProps): string {
         <!-- Logo Section (full-width, at top) -->
         <section class="settings-card">
           <div class="card-header">
-            <h2>🖼️ Logo Overlay</h2>
+            <div>
+              <h2>🖼️ Logo Overlay</h2>
+              <p style="font-size: 0.8rem; color: var(--toast-yellow); margin-top: 0.25rem;">⚠️ Changes require restart</p>
+            </div>
             <label class="toggle">
               <input type="checkbox" id="logoEnabled" name="logoEnabled" value="true" ${config.logo.enabled ? 'checked' : ''}>
               <span class="toggle-slider"></span>
@@ -41,10 +44,11 @@ export function renderSettings(props: SettingsProps): string {
             <div class="logo-controls">
               ${renderLogoUpload(hasLogo)}
               ${renderPositionGrid(config.logo.position)}
+              ${renderOffsetControls(config.logo.x, config.logo.y)}
               ${renderOpacitySlider(config.logo.opacity)}
             </div>
             
-            ${renderLogoPreview(hasLogo, config.logo.opacity, config.logo.position)}
+            ${renderLogoPreview(hasLogo, config.logo.opacity, config.logo.position, config.logo.x, config.logo.y)}
           </div>
         </section>
         
@@ -237,6 +241,21 @@ function renderPositionGrid(currentPosition: number): string {
   `
 }
 
+function renderOffsetControls(x: number, y: number): string {
+  return `
+    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label for="logoX">Offset X (px)</label>
+        <input type="number" id="logoX" name="logoX" value="${x}" oninput="updateLogoPreview()" style="width: 100%;">
+      </div>
+      <div class="form-group">
+        <label for="logoY">Offset Y (px)</label>
+        <input type="number" id="logoY" name="logoY" value="${y}" oninput="updateLogoPreview()" style="width: 100%;">
+      </div>
+    </div>
+  `
+}
+
 function renderOpacitySlider(opacity: number): string {
   const percent = Math.round((opacity / 255) * 100)
 
@@ -257,7 +276,9 @@ function renderOpacitySlider(opacity: number): string {
 function renderLogoPreview(
   hasLogo: boolean,
   opacity: number,
-  position: number
+  position: number,
+  x: number,
+  y: number
 ): string {
   const isTop = position === 0 || position === 2
   const isLeft = position === 0 || position === 6
@@ -269,7 +290,7 @@ function renderLogoPreview(
         ${
           hasLogo
             ? `<img src="/logo" alt="Logo preview" class="screen-logo" id="screenLogo" 
-                    style="opacity: ${opacity / 255}; ${isLeft ? 'left: 8px;' : 'right: 8px;'} ${isTop ? 'top: 8px;' : 'bottom: 8px;'}">`
+                    style="opacity: ${opacity / 255}; ${isLeft ? `left: ${x}px;` : `right: ${x}px;`} ${isTop ? `top: ${y}px;` : `bottom: ${y}px;`}">`
             : ''
         }
       </div>
@@ -303,12 +324,14 @@ function getSettingsScript(): string {
       
       const opacity = document.getElementById('logoOpacity').value / 255;
       const position = document.getElementById('logoPosition').value;
+      const x = document.getElementById('logoX').value + 'px';
+      const y = document.getElementById('logoY').value + 'px';
       
       logo.style.opacity = opacity;
-      logo.style.top = (position === '0' || position === '2') ? '8px' : 'auto';
-      logo.style.bottom = (position === '6' || position === '8') ? '8px' : 'auto';
-      logo.style.left = (position === '0' || position === '6') ? '8px' : 'auto';
-      logo.style.right = (position === '2' || position === '8') ? '8px' : 'auto';
+      logo.style.top = (position === '0' || position === '2') ? y : 'auto';
+      logo.style.bottom = (position === '6' || position === '8') ? y : 'auto';
+      logo.style.left = (position === '0' || position === '6') ? x : 'auto';
+      logo.style.right = (position === '2' || position === '8') ? x : 'auto';
     }
   `
 }
