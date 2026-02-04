@@ -11,6 +11,7 @@ import type { DashboardEventService } from './DashboardEventService'
 import type { ConfigService } from './ConfigService'
 import type { IMediaRepository } from '../repositories/IMediaRepository'
 import { logger } from '../utils/logger'
+import { VlcConnectionError } from '../clients/VlcClient'
 
 export interface PlaybackServiceDeps {
   vlc: IVlcController
@@ -379,6 +380,7 @@ export class PlaybackService {
   private async runPlaybackLoop(): Promise<void> {
     // Track state for transition detection
     let lastPosition = 0
+    let disconnectedLogged = false
 
     while (this.running) {
       // In off-air mode, just keep looping (VLC handles the loop)
@@ -394,6 +396,7 @@ export class PlaybackService {
 
       try {
         const status = await this.vlc.getStatus()
+        disconnectedLogged = false // Connection active
 
         // Calculate dynamic "late in video" threshold based on actual video duration
         const expectedDuration = this.currentVideo?.durationSeconds ?? 30
@@ -441,6 +444,7 @@ export class PlaybackService {
             // Update internal state to match VLC
             this.currentVideo = next
             lastPosition = status.positionSeconds // Reset position tracking
+            disconnectedLogged = false
 
             // Broadcast track change
             const queue = this.peekQueue(10).map((v) => ({
@@ -483,7 +487,23 @@ export class PlaybackService {
           // No transition - just update tracking
           lastPosition = status.positionSeconds
         }
-      } catch (error) {
+      } catch (error: any) {
+        const msg = error?.message || String(error)
+        const isVlcError =
+          msg.includes('Not connected') ||
+          msg.includes('ECONNREFUSED') ||
+          error instanceof VlcConnectionError
+
+        if (isVlcError) {
+          if (!disconnectedLogged) {
+            console.error(
+              `❌ VLC Connection Lost: ${msg}\n   -> Please restart VLC manually to resume playback.`
+            )
+            disconnectedLogged = true
+          }
+          await Bun.sleep(5000)
+          continue
+        }
         logger.error('Playback loop error:', error)
       }
 
