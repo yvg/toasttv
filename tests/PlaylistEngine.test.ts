@@ -387,7 +387,7 @@ describe('PlaylistEngine', () => {
     engine.skipQuotaForToday()
 
     // Pull enough videos to exhaust the original limit
-    let playedVideos: string[] = []
+    const playedVideos: string[] = []
     for (let i = 0; i < 10; i++) {
       const v = await engine.getNextVideo()
       if (!v) break

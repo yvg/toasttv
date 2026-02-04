@@ -375,7 +375,6 @@ export class PlaybackService {
    */
   private async runPlaybackLoop(): Promise<void> {
     // Track state for transition detection
-    let lastKnownFile: string | null = null
     let lastPosition = 0
 
     while (this.running) {
