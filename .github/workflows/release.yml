@@ -30,7 +30,8 @@ jobs:
           # Compile to standalone binary for Linux ARM64 (Raspberry Pi 64-bit)
           # --bytecode: Pre-compile into bytecode for faster startup
           # --minify: Reduce file size
-          bun build --compile --minify --bytecode --target=linux-arm64 --outfile=dist/toasttv ./src/main.ts
+          # Target must include 'bun-' prefix (e.g. bun-linux-arm64)
+          bun build --compile --minify --bytecode --target=bun-linux-arm64 --outfile=dist/toasttv ./src/main.ts
 
       - name: Create Release Archive
         run: |
