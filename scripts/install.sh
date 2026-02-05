@@ -93,9 +93,9 @@ else
     useradd -r -s /bin/false -d $INSTALL_DIR $SERVICE_NAME
 fi
 
-# Ensure permissions for audio/video
-log "Granting audio/video permissions..."
-usermod -a -G audio,video,render $SERVICE_NAME 2>/dev/null || usermod -a -G audio,video $SERVICE_NAME
+# Ensure permissions for audio/video/tty(for X11)
+log "Granting audio/video/tty permissions..."
+usermod -a -G audio,video,render,tty $SERVICE_NAME 2>/dev/null || usermod -a -G audio,video,tty $SERVICE_NAME
 
 # Configure X11 permissions for kiosk mode
 log "Configuring X11 wrapper permissions..."
@@ -172,22 +172,18 @@ cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
 #!/bin/bash
 # ToastTV X11 Session
 # This script runs INSIDE the X session started by xinit
-# X is started as root, but VLC and app run as toasttv user
+# Runs as the service user (toasttv)
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
-APP_USER="toasttv"
-
-# Allow toasttv user to access this X display
-xhost +local:
 
 # Disable screen blanking / power saving
 xset -dpms
 xset s off
 xset s noblank
 
-# Start VLC fullscreen with RC interface (as non-root user)
-runuser -u $APP_USER -- cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
+# Start VLC fullscreen with RC interface
+cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 VLC_PID=$!
 
 # Wait for VLC RC interface
@@ -205,8 +201,8 @@ fi
 
 echo "VLC ready on port $VLC_PORT"
 
-# Start ToastTV app as non-root user (this blocks until exit)
-runuser -u $APP_USER -- $INSTALL_DIR/bin/toasttv
+# Start ToastTV app (this blocks until exit)
+$INSTALL_DIR/bin/toasttv
 
 # Cleanup VLC when app exits
 kill $VLC_PID 2>/dev/null
@@ -243,10 +239,8 @@ After=network.target
 
 [Service]
 Type=simple
-# Run as root to allow starting X server
-# NOTE: VLC/Xorg drop privileges internally
-User=root
-Group=root
+User=$SERVICE_NAME
+Group=$SERVICE_NAME
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/bin/start-toasttv
 Restart=on-failure
