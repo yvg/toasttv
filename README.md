@@ -57,7 +57,7 @@ The mascots **Penny & Chip** are ready to run your station.
 
 ## Tech Stack
 
-Built with simplicity and performance in mind, ror a deep dive into tech stack, code structure and design decisions, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for tech stack, and design decisions.
 
 ## Development
 
