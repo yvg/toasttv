@@ -168,28 +168,38 @@ rm -rf "$TMP_DIR"
 
 log "Installed binary & starter content successfully"
 
-# --- Create X11 Session Script (runs as user) ---
+
+# --- Create X11 Session Script (Mixed Privileges) ---
 log "Creating X11 session script..."
 cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
 #!/bin/bash
 # ToastTV X11 Session
-# This script runs INSIDE the X session started by xinit
-# Executed as unprivileged user (toasttv)
+# Runs INSIDE X server.
+# Executed as ROOT (because xinit runs as root).
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
+APP_USER="toasttv"
 
-# Allow local X connection (if needed)
-xhost +local:
+# 1. Allow 'toasttv' user to connect to this root-owned X display
+xhost +si:localuser:$APP_USER
 
-# Disable screen blanking / power saving
+# 2. Disable power saving (as root, applies to display)
 xset -dpms
 xset s off
 xset s noblank
 
-# Start VLC fullscreen with RC interface
-# Running as user, so no root conflicts
-cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
+# 3. Start VLC as toasttv user
+# -l: login shell ensures HOME=/opt/toasttv so VLC finds its config
+# & at end of command string runs it in background of the user shell? 
+# Actually simpler: runuser -u toasttv command &
+# But we need HOME variables.
+# We will explicitly set HOME to avoid login shell complexities with backgrounding
+
+export HOME=$(getent passwd $APP_USER | cut -d: -f6)
+
+echo "Starting VLC as $APP_USER (HOME=$HOME)..."
+runuser -u $APP_USER -- cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 VLC_PID=$!
 
 # Wait for VLC RC interface
@@ -202,35 +212,42 @@ done
 
 if ! nc -z localhost $VLC_PORT 2>/dev/null; then
     echo "ERROR: VLC RC interface not responding"
+    # Try logging why
+    ps aux | grep vlc
     exit 1
 fi
 
 echo "VLC ready on port $VLC_PORT"
 
-# Start ToastTV app (this blocks until exit)
-$INSTALL_DIR/bin/toasttv
+# 4. Start ToastTV app as toasttv user
+# This blocks until app exits
+echo "Starting ToastTV..."
+runuser -u $APP_USER -- $INSTALL_DIR/bin/toasttv
 
-# Cleanup VLC when app exits
+# Cleanup
 kill $VLC_PID 2>/dev/null
 XSESSION
 
 chmod +x $INSTALL_DIR/bin/toasttv-session
 
-# --- Create Launcher Script (starts as root, switches user) ---
+# --- Create Launcher Script (ROOT) ---
 log "Creating X11 kiosk launcher..."
 cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
 #!/bin/bash
-# ToastTV X11 Kiosk Launcher
-# Starts as root (systemd), drops to user for X session
+# Starts Xorg as ROOT (to access TTY/GPU)
+# Session script handles dropping privileges for Clients
 
 INSTALL_DIR="/opt/toasttv"
-APP_USER="toasttv"
 
-# Switch to user and run xinit with cleaner environment
-# -l: simulate login shell (sets HOME, PATH, etc)
-# -c: command to run
-# We pass the full xinit command line here
-exec runuser -l $APP_USER -c "xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp"
+# Ensure we are root
+if [ "$(id -u)" -ne 0 ]; then
+   echo "Must run as root"
+   exit 1
+fi
+
+# Start X11
+# - :0 vt1: Display 0 on TTY1
+exec xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp
 LAUNCHER
 
 chmod +x $INSTALL_DIR/bin/start-toasttv
