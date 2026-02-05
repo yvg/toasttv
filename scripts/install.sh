@@ -166,16 +166,19 @@ rm -rf "$TMP_DIR"
 
 log "Installed binary & starter content successfully"
 
-# --- Create X11 Session Script (runs inside X) ---
+# --- Create X11 Session Script (runs as user) ---
 log "Creating X11 session script..."
 cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
 #!/bin/bash
 # ToastTV X11 Session
 # This script runs INSIDE the X session started by xinit
-# Runs as the service user (toasttv)
+# Executed as unprivileged user (toasttv)
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
+
+# Allow local X connection (if needed)
+xhost +local:
 
 # Disable screen blanking / power saving
 xset -dpms
@@ -183,6 +186,7 @@ xset s off
 xset s noblank
 
 # Start VLC fullscreen with RC interface
+# Running as user, so no root conflicts
 cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 VLC_PID=$!
 
@@ -210,19 +214,21 @@ XSESSION
 
 chmod +x $INSTALL_DIR/bin/toasttv-session
 
-# --- Create Launcher Script (uses xinit) ---
+# --- Create Launcher Script (starts as root, switches user) ---
 log "Creating X11 kiosk launcher..."
 cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
 #!/bin/bash
 # ToastTV X11 Kiosk Launcher
-# Uses xinit to properly manage X server lifecycle
+# Starts as root (systemd), drops to user for X session
 
 INSTALL_DIR="/opt/toasttv"
+APP_USER="toasttv"
 
-# xinit runs the session script inside a new X server
-# -- :0 vt1: X server on display :0, virtual terminal 1
-# -nocursor: Hide mouse cursor
-exec xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp
+# Switch to user and run xinit with cleaner environment
+# -l: simulate login shell (sets HOME, PATH, etc)
+# -c: command to run
+# We pass the full xinit command line here
+exec runuser -l $APP_USER -c "xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp"
 LAUNCHER
 
 chmod +x $INSTALL_DIR/bin/start-toasttv
@@ -239,8 +245,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=$SERVICE_NAME
-Group=$SERVICE_NAME
+User=root
+Group=root
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/bin/start-toasttv
 Restart=on-failure
