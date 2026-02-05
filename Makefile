@@ -1,6 +1,6 @@
 # ToastTV Makefile
 
-.PHONY: install start dev test typecheck clean help mpv
+.PHONY: install start dev test typecheck clean help mpv pack serve-local
 
 # Auto-detect bun
 BUN := $(shell command -v bun 2>/dev/null || echo "$$HOME/.bun/bin/bun")
@@ -11,13 +11,15 @@ MPV_SOCKET := /tmp/toasttv-mpv.sock
 
 help:
 	@echo "ToastTV Commands:"
-	@echo "  make install    - Install Bun + dependencies (mpv, ffmpeg)"
-	@echo "  make start      - Start MPV + daemon"
-	@echo "  make dev        - Start with watch mode"
-	@echo "  make test       - Run unit tests"
-	@echo "  make typecheck  - Run TypeScript type checking"
-	@echo "  make mpv        - Start MPV daemon locally"
-	@echo "  make clean      - Remove build artifacts"
+	@echo "  make install      - Install Bun + dependencies (mpv, ffmpeg)"
+	@echo "  make start        - Start MPV + daemon"
+	@echo "  make dev          - Start with watch mode"
+	@echo "  make test         - Run unit tests"
+	@echo "  make typecheck    - Run TypeScript type checking"
+	@echo "  make mpv          - Start MPV daemon locally"
+	@echo "  make pack         - Build local release tarball"
+	@echo "  make serve-local  - Pack + start dev server for VM testing"
+	@echo "  make clean        - Remove build artifacts"
 
 install:
 	@# Install Bun if needed
@@ -57,7 +59,7 @@ mpv:
 		echo "MPV already running"; \
 	else \
 		echo "Starting MPV daemon..."; \
-		$(MPV) --idle --input-ipc-server=$(MPV_SOCKET) --no-terminal &>/dev/null & \
+		$(MPV) --idle --input-ipc-server=$(MPV_SOCKET) --script=scripts/logo.lua --no-terminal &>/dev/null & \
 		sleep 1; \
 	fi
 
@@ -74,5 +76,12 @@ typecheck:
 	@$(BUN) tsc --noEmit
 
 clean:
-	@rm -rf node_modules .bun data/media.db
+	@rm -rf node_modules .bun data/media.db dist
 	@pkill -x mpv 2>/dev/null || true
+
+pack:
+	@chmod +x scripts/pack.sh
+	@./scripts/pack.sh
+
+serve-local: pack
+	@$(BUN) run scripts/dev-server.ts

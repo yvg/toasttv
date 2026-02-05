@@ -234,94 +234,84 @@ export class MpvClient implements IMediaPlayer {
     const mx = config.x || 0
     const my = config.y || 0
 
-    let xExpr = `${mx}`
-    let yExpr = `${my}`
+    // 3. Map Position to Numpad Alignment for Lua Script
+    // 7 8 9
+    // 4 5 6
+    // 1 2 3
+    let align = 9 // Default Top-Right
 
-    // Position constants
-    // 0=Center, 1=Left, 2=Right, 4=Top, 8=Bottom
-    // 5=Top-Left, 6=Top-Right, 9=Bottom-Left, 10=Bottom-Right
     switch (config.position) {
-      case 0: // Center
-        xExpr = `(main_w-overlay_w)/2`
-        yExpr = `(main_h-overlay_h)/2`
-        break
-      case 1: // Left
-        xExpr = `${mx}`
-        yExpr = `(main_h-overlay_h)/2`
-        break
-      case 2: // Right
-        xExpr = `main_w-overlay_w-${mx}`
-        yExpr = `(main_h-overlay_h)/2`
-        break
-      case 4: // Top
-        xExpr = `(main_w-overlay_w)/2`
-        yExpr = `${my}`
-        break
-      case 8: // Bottom
-        xExpr = `(main_w-overlay_w)/2`
-        yExpr = `main_h-overlay_h-${my}`
-        break
-      case 5: // Top-Left
-        xExpr = `${mx}`
-        yExpr = `${my}`
-        break
-      case 6: // Top-Right
-        xExpr = `main_w-overlay_w-${mx}`
-        yExpr = `${my}`
-        break
-      case 9: // Bottom-Left
-        xExpr = `${mx}`
-        yExpr = `main_h-overlay_h-${my}`
-        break
-      case 10: // Bottom-Right
-        xExpr = `main_w-overlay_w-${mx}`
-        yExpr = `main_h-overlay_h-${my}`
-        break
+      case 0:
+        align = 5
+        break // Center
+      case 1:
+        align = 4
+        break // Left -> Mid-Left
+      case 2:
+        align = 6
+        break // Right -> Mid-Right
+      case 4:
+        align = 8
+        break // Top -> Top-Center
+      case 8:
+        align = 2
+        break // Bottom -> Bot-Center
+      case 5:
+        align = 7
+        break // Top-Left
+      case 6:
+        align = 9
+        break // Top-Right
+      case 9:
+        align = 1
+        break // Bot-Left
+      case 10:
+        align = 3
+        break // Bot-Right
       default:
-        // Default to Top-Left or custom if unknown
-        xExpr = `${mx}`
-        yExpr = `${my}`
+        align = 9
+        break // Top-Right
     }
 
     // Escaping path for mpv/ffmpeg
     // MUST use absolute path for movie filter to be safe
     // Also remove ./ prefix if present just in case before resolve, though resolve handles it
     const absPath = path.resolve(config.filePath)
-    // Replace backslashes with forward slashes for ffmpeg on windows? Mac needed? strict escaping?
-    // FFmpeg inside MPV expects: match ' with '\''
-    // And if path has : it must be escaped as \: inside filter string?
     // Let's stick to ' escaping for now.
-    const safePath = absPath.replace(/'/g, "'\\''")
-
-    // Filter Graph Construction
-    // 1. movie='path' [logo]
-    // 2. [logo] format=rgba, colorchannelmixer=aa=ALPHA [logo_alpha]
-    // 3. [in][logo_alpha] overlay=x=...:y=... [out]
-
-    // Filter Graph Construction
-    // 1. movie='path' [logo]
-    // 2. [logo] format=rgba, colorchannelmixer=aa=ALPHA [logo_ready]
-    // 3. [in][logo_ready] overlay=x=...:y=... [out]
 
     // Use optimized path if possible, fallback to original
-    let finalPath = safePath
+    let finalPath = absPath
     try {
       if (absPath) {
-        // We need the raw path for ffmpeg, not the escaped one
+        // Optimization still useful to cap size even for OSD!
+        // Large images in OSD can suck memory/bandwidth.
         finalPath = await this.ensureOptimizedLogo(absPath)
-        // Escape the new path
-        finalPath = finalPath.replace(/'/g, "'\\''")
+        // Lua script expects normal path, strict escaping might not be needed as much?
+        // But let's be safe. Lua uses it in \1img().
+        finalPath = finalPath.replace(/\\/g, '/') // Ensure forward slashes for Lua/MPV
       }
     } catch (e) {
       console.error('Logo optimization failed, using original:', e)
     }
 
-    const filter = `movie='${finalPath}'[logo];[logo]format=rgba,colorchannelmixer=aa=${alpha}[logo_ready];[in][logo_ready]overlay=x=${xExpr}:y=${yExpr}[out]`
-
-    console.log(`[MpvClient] Setting logo:`, { config, filter })
+    console.log(`[MpvClient] Setting logo via Lua OSD:`, {
+      config,
+      align,
+      finalPath,
+    })
 
     try {
-      await this.send(['vf', 'add', `@logo:lavfi=[${filter}]`])
+      // script-message show-logo <path> <align> <mx> <my> <opacity>
+      // MPV requires all args to be strings
+      await this.send([
+        'script-message',
+        'show-logo',
+        finalPath,
+        String(align),
+        String(mx),
+        String(my),
+        String(config.opacity),
+      ])
     } catch (e) {
       console.error('Failed to set logo overlay:', e)
     }

@@ -12,11 +12,13 @@ set -e
 
 REPO_OWNER="yvg"
 REPO_NAME="toasttv"
-REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}"
 INSTALL_DIR="/opt/toasttv"
 SERVICE_NAME="toasttv"
 APP_PORT=1993
-APP_PORT=1993
+
+# Allow overriding URLs for local dev testing
+REPO_URL="${LOCAL_SERVER:-https://github.com/${REPO_OWNER}/${REPO_NAME}}"
+API_URL="${LOCAL_SERVER:-https://api.github.com}"
 
 # Colors
 RED='\033[0;31m'
@@ -67,10 +69,10 @@ fi
 
 # ... [Log Header] ...
 
-# --- Determin Version ---
+# --- Determine Version ---
 if [[ -z "$VERSION" ]]; then
     log "Fetching latest release..."
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 || echo "")
+    VERSION=$(curl -fsSL "${API_URL}/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 || echo "")
 fi
 
 if [[ -z "$VERSION" ]]; then
@@ -98,15 +100,12 @@ fi
 log "Granting audio/video/render permissions..."
 usermod -a -G audio,video,render $SERVICE_NAME
 
-# Remove legacy X11 hack if present
-if [ -f /etc/X11/Xwrapper.config ]; then
-    rm -f /etc/X11/Xwrapper.config
-fi
 # --- Install Application ---
 log "Downloading ToastTV $VERSION..."
 TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
 
 TMP_DIR=$(mktemp -d)
+log "Fetching: $TARBALL_URL"
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/toasttv.tar.gz"
 
 # Cleanup old app
@@ -126,34 +125,45 @@ chmod +x $INSTALL_DIR/bin/toasttv
 rm -rf $INSTALL_DIR/public
 mv $INSTALL_DIR/toasttv/public $INSTALL_DIR/public
 
+# Remote source variables (post-extraction)
+SRC_MEDIA="$INSTALL_DIR/toasttv/media"
+SRC_DATA="$INSTALL_DIR/toasttv/data"
+
 # Install/Seed Starter Media (Videos)
 mkdir -p $INSTALL_DIR/media/videos
-if [[ -z "$(ls -A $INSTALL_DIR/media/videos)" ]] && [[ -d "$INSTALL_DIR/toasttv/media/videos" ]]; then
-    log "Seeding Starter Videos (Caminandes)..."
-    cp $INSTALL_DIR/toasttv/media/videos/* $INSTALL_DIR/media/videos/
+if [[ -z "$(ls -A $INSTALL_DIR/media/videos)" ]] && [[ -d "$SRC_MEDIA/videos" ]]; then
+    log "Seeding Starter Videos..."
+    cp $SRC_MEDIA/videos/* $INSTALL_DIR/media/videos/
 else
-    log "Skipping Starter Videos (Library not empty)"
+    log "Skipping Starter Videos (Library not empty or source missing)"
 fi
 
 # Install/Seed Starter Media (Interludes)
 mkdir -p $INSTALL_DIR/media/interludes
-if [[ -z "$(ls -A $INSTALL_DIR/media/interludes)" ]] && [[ -d "$INSTALL_DIR/toasttv/media/interludes" ]]; then
-    log "Seeding Starter Interludes (Penny & Chip)..."
-    cp $INSTALL_DIR/toasttv/media/interludes/* $INSTALL_DIR/media/interludes/
+if [[ -z "$(ls -A $INSTALL_DIR/media/interludes)" ]] && [[ -d "$SRC_MEDIA/interludes" ]]; then
+    log "Seeding Starter Interludes..."
+    cp $SRC_MEDIA/interludes/* $INSTALL_DIR/media/interludes/
 else
-    log "Skipping Starter Interludes (Library not empty)"
+    log "Skipping Starter Interludes (Library not empty or source missing)"
 fi
 
 # Install/Seed Data (Config/Logo) - Only if missing
 mkdir -p $INSTALL_DIR/data
-if [[ -d "$INSTALL_DIR/toasttv/data" ]]; then
-    for file in "$INSTALL_DIR/toasttv/data"/*; do
+if [[ -d "$SRC_DATA" ]]; then
+    for file in "$SRC_DATA"/*; do
         filename=$(basename "$file")
         if [[ ! -e "$INSTALL_DIR/data/$filename" ]]; then
             log "Seeding default $filename..."
             cp -r "$file" "$INSTALL_DIR/data/"
         fi
     done
+fi
+
+# Install Scripts (logo.lua)
+mkdir -p $INSTALL_DIR/scripts
+if [ -f "$INSTALL_DIR/toasttv/scripts/logo.lua" ]; then
+    cp $INSTALL_DIR/toasttv/scripts/logo.lua $INSTALL_DIR/scripts/
+    log "Installed logo.lua overlay script"
 fi
 
 # Cleanup extracted folder
@@ -179,7 +189,7 @@ MPV_SOCKET="/tmp/toasttv-mpv.sock"
 # Note: On standard Debian/Pi, --vo=gpu --gpu-context=drm is standard. 
 #       If that fails, --vo=drm is fallback.
 echo "Starting MPV daemon..."
-mpv --idle --input-ipc-server=$MPV_SOCKET --vo=gpu --gpu-context=drm --hwdec=auto --no-terminal &
+mpv --idle --input-ipc-server=$MPV_SOCKET --vo=gpu --gpu-context=drm --hwdec=auto --script=$INSTALL_DIR/scripts/logo.lua --no-terminal &
 MPV_PID=$!
 
 # Wait for socket

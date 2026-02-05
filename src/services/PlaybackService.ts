@@ -270,6 +270,22 @@ export class PlaybackService {
     this.currentVideo = video
     await this.player.play(video.path)
 
+    // Refresh logo on each video (MPV clears overlays on track change)
+    try {
+      const appConfig = await this.config.get()
+      if (appConfig.logo) {
+        await this.player.updateLogo({
+          filePath: appConfig.logo.imagePath,
+          opacity: appConfig.logo.opacity,
+          position: appConfig.logo.position,
+          x: appConfig.logo.x,
+          y: appConfig.logo.y,
+        })
+      }
+    } catch (e) {
+      logger.error('Failed to apply logo:', e)
+    }
+
     // Emit track start event with updated queue
     const queue = this.peekQueue(10).map((v) => ({
       id: v.id,
@@ -504,6 +520,22 @@ export class PlaybackService {
               duration: next.durationSeconds,
               queue,
             })
+
+            // Refresh logo (MPV clears overlays on track change)
+            try {
+              const appConfig = await this.config.get()
+              if (appConfig.logo) {
+                await this.player.updateLogo({
+                  filePath: appConfig.logo.imagePath,
+                  opacity: appConfig.logo.opacity,
+                  position: appConfig.logo.position,
+                  x: appConfig.logo.x,
+                  y: appConfig.logo.y,
+                })
+              }
+            } catch (e) {
+              logger.error('Failed to refresh logo:', e)
+            }
 
             // PRE-QUEUE: Immediately enqueue the following video
             const upcoming = this.engine.peekQueue(1)[0]
