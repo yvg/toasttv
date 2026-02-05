@@ -79,10 +79,11 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 # --- Install System Dependencies ---
-log "Installing dependencies (VLC, FFmpeg)..."
+log "Installing dependencies (VLC, FFmpeg, X11)..."
 apt-get update -qq
-# specific plugins ensuring DRM/MMAL support on minimal installs
-apt-get install -y -qq vlc vlc-plugin-video-output ffmpeg curl
+# VLC + X11 for kiosk mode (headless video output)
+apt-get install -y -qq vlc vlc-plugin-video-output ffmpeg curl \
+    xserver-xorg-core xinit x11-xserver-utils
 
 # --- Create System User ---
 if id -u $SERVICE_NAME &>/dev/null; then
@@ -95,6 +96,15 @@ fi
 # Ensure permissions for audio/video
 log "Granting audio/video permissions..."
 usermod -a -G audio,video,render $SERVICE_NAME 2>/dev/null || usermod -a -G audio,video $SERVICE_NAME
+
+# Configure X11 permissions for kiosk mode
+log "Configuring X11 wrapper permissions..."
+mkdir -p /etc/X11
+cat > /etc/X11/Xwrapper.config << XWRAP
+# Allow X server to start from systemd service
+allowed_users=anybody
+needs_root_rights=yes
+XWRAP
 
 # --- Install Application ---
 log "Downloading ToastTV $VERSION..."
@@ -156,28 +166,54 @@ rm -rf "$TMP_DIR"
 
 log "Installed binary & starter content successfully"
 
-# --- Create Launcher Script ---
-log "Creating launcher wrapper..."
+# --- Create Launcher Script (X11 Kiosk Mode) ---
+log "Creating X11 kiosk launcher..."
 cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
 #!/bin/bash
-# ToastTV Wrapper
+# ToastTV X11 Kiosk Launcher
+# Starts a minimal X server + VLC fullscreen
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
+export DISPLAY=:0
 
 cleanup() {
     pkill -P $$ cvlc 2>/dev/null || true
+    pkill -P $$ Xorg 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGTERM SIGINT EXIT
 
-# Start VLC (Headless Mode, DRM Output)
-# -I dummy: No GUI
-# --vout drm_vout: Direct Rendering Manager (works on console/CLI without X11)
-# --no-osd: Clean output
-cvlc -I dummy --vout drm_vout --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
+# Start minimal X server
+# -nolisten tcp: Security (no remote X)
+# vt1: Use virtual terminal 1 (console)
+# -nocursor: Hide mouse cursor
+Xorg :0 -nolisten tcp -nocursor vt1 &
+XPID=$!
 
-# Wait for VLC
+# Wait for X to be ready
+for i in {1..30}; do
+    if xdpyinfo -display :0 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+done
+
+if ! xdpyinfo -display :0 >/dev/null 2>&1; then
+    echo "ERROR: X server failed to start"
+    exit 1
+fi
+
+# Disable screen blanking / power saving
+xset -display :0 -dpms
+xset -display :0 s off
+xset -display :0 s noblank
+
+# Start VLC fullscreen with RC interface for remote control
+cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
+VLC_PID=$!
+
+# Wait for VLC RC interface
 for i in {1..20}; do
     if nc -z localhost $VLC_PORT 2>/dev/null; then
         break
@@ -185,7 +221,14 @@ for i in {1..20}; do
     sleep 0.5
 done
 
-# Start App
+if ! nc -z localhost $VLC_PORT 2>/dev/null; then
+    echo "ERROR: VLC RC interface not responding"
+    exit 1
+fi
+
+echo "X11 + VLC ready on DISPLAY=:0"
+
+# Start ToastTV app
 exec $INSTALL_DIR/bin/toasttv
 LAUNCHER
 
@@ -203,12 +246,20 @@ After=network.target
 
 [Service]
 Type=simple
-User=$SERVICE_NAME
-Group=$SERVICE_NAME
+# Run as root to allow starting X server
+# NOTE: VLC/Xorg drop privileges internally
+User=root
+Group=root
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/bin/start-toasttv
 Restart=on-failure
 RestartSec=5
+
+# X11 requires access to virtual terminal
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
 
 Environment=NODE_ENV=production
 Environment=TOASTTV_DATA=$INSTALL_DIR/data
