@@ -300,11 +300,23 @@ export class MpvClient implements IMediaPlayer {
 
     // Filter Graph Construction
     // 1. movie='path' [logo]
-    // 2. [logo][in] scale2ref=h=ih*0.15:w=-1 [logo_scaled][in_ref] (Scale logo to 15% of video height)
-    // 3. [logo_scaled] format=rgba,colorchannelmixer=aa=ALPHA [logo_ready]
-    // 4. [in_ref][logo_ready] overlay=x=...:y=... [out]
+    // 2. [logo] format=rgba, colorchannelmixer=aa=ALPHA [logo_ready]
+    // 3. [in][logo_ready] overlay=x=...:y=... [out]
 
-    const filter = `movie='${safePath}'[logo];[logo][in]scale2ref=h=ih*0.15:w=-1[logo_scaled][in_ref];[logo_scaled]format=rgba,colorchannelmixer=aa=${alpha}[logo_ready];[in_ref][logo_ready]overlay=x=${xExpr}:y=${yExpr}[out]`
+    // Use optimized path if possible, fallback to original
+    let finalPath = safePath
+    try {
+      if (absPath) {
+        // We need the raw path for ffmpeg, not the escaped one
+        finalPath = await this.ensureOptimizedLogo(absPath)
+        // Escape the new path
+        finalPath = finalPath.replace(/'/g, "'\\''")
+      }
+    } catch (e) {
+      console.error('Logo optimization failed, using original:', e)
+    }
+
+    const filter = `movie='${finalPath}'[logo];[logo]format=rgba,colorchannelmixer=aa=${alpha}[logo_ready];[in][logo_ready]overlay=x=${xExpr}:y=${yExpr}[out]`
 
     console.log(`[MpvClient] Setting logo:`, { config, filter })
 
@@ -312,6 +324,52 @@ export class MpvClient implements IMediaPlayer {
       await this.send(['vf', 'add', `@logo:lavfi=[${filter}]`])
     } catch (e) {
       console.error('Failed to set logo overlay:', e)
+    }
+  }
+
+  /**
+   * Pre-scales the logo to a fixed height (120px) to avoid expensive
+   * real-time scaling filters in MPV (which kill HW decoding on Pi).
+   */
+  private async ensureOptimizedLogo(sourcePath: string): Promise<string> {
+    const ext = path.extname(sourcePath)
+    const base = path.basename(sourcePath, ext)
+    const fs = require('node:fs') // Lazy load
+
+    // Save to /tmp to avoid file permission/persistence issues?
+    // Or save next to original if writable. Let's try /tmp for safety and speed.
+    const destPath = `/tmp/${base}-optimized.png`
+
+    // If source is missing, throw
+    if (!fs.existsSync(sourcePath)) return sourcePath
+
+    try {
+      // ffmpeg -y -i source -vf "scale=iw*min(1\,120/ih):-1" dest
+      // Caps height at 120px, but allows smaller logos (like 80px) to pass through untouched.
+      const proc = Bun.spawn([
+        'ffmpeg',
+        '-y',
+        '-v',
+        'error',
+        '-i',
+        sourcePath,
+        '-vf',
+        'scale=iw*min(1\\,120/ih):-1',
+        destPath,
+      ])
+
+      await proc.exited
+
+      if (proc.exitCode === 0) {
+        console.log(`[MpvClient] Logo optimized to ${destPath}`)
+        return destPath
+      } else {
+        console.warn(`[MpvClient] FFmpeg failed with code ${proc.exitCode}`)
+        return sourcePath
+      }
+    } catch (e) {
+      console.warn('[MpvClient] Failed to spawn ffmpeg:', e)
+      return sourcePath
     }
   }
 }
