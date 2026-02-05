@@ -80,17 +80,19 @@ fi
 
 # --- Install System Dependencies ---
 log "Installing dependencies (VLC, FFmpeg, X11)..."
-apt-get update -qq
 # VLC + X11 for kiosk mode (headless video output)
+# xserver-xorg: metapackage including VIDEO DRIVERS (critical for Pi)
 apt-get install -y -qq vlc vlc-plugin-video-output ffmpeg curl \
-    xserver-xorg-core xinit x11-xserver-utils
+    xserver-xorg xinit x11-xserver-utils
 
 # --- Create System User ---
 if id -u $SERVICE_NAME &>/dev/null; then
     log "User '$SERVICE_NAME' already exists"
+    # Ensure user has valid shell for runuser -l
+    usermod -s /bin/bash $SERVICE_NAME
 else
     log "Creating system user '$SERVICE_NAME'..."
-    useradd -r -s /bin/false -d $INSTALL_DIR $SERVICE_NAME
+    useradd -r -s /bin/bash -d $INSTALL_DIR $SERVICE_NAME
 fi
 
 # Ensure permissions for audio/video/tty(for X11)
