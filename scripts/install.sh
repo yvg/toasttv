@@ -170,8 +170,10 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT EXIT
 
-# Start VLC (with logging to journal, headless safe)
-cvlc --no-x-lib --extraintf rc --rc-host localhost:$VLC_PORT &
+# Start VLC (Headless Mode)
+# -I dummy: Use dummy interface (no GUI)
+# --vout: Video output module (let VLC decide best for Pi, usually mmal_vout or gles2)
+cvlc -I dummy --extraintf rc --rc-host localhost:$VLC_PORT &
 
 # Wait for VLC
 for i in {1..20}; do
