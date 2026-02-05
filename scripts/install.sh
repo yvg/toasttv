@@ -81,7 +81,8 @@ fi
 # --- Install System Dependencies ---
 log "Installing dependencies (VLC, FFmpeg)..."
 apt-get update -qq
-apt-get install -y -qq vlc ffmpeg curl
+# specific plugins ensuring DRM/MMAL support on minimal installs
+apt-get install -y -qq vlc vlc-plugin-video-output ffmpeg curl
 
 # --- Create System User ---
 if id -u $SERVICE_NAME &>/dev/null; then
@@ -170,10 +171,11 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT EXIT
 
-# Start VLC (Headless Mode)
-# -I dummy: Use dummy interface (no GUI)
-# --vout: Video output module (let VLC decide best for Pi, usually mmal_vout or gles2)
-cvlc -I dummy --extraintf rc --rc-host localhost:$VLC_PORT &
+# Start VLC (Headless Mode, DRM Output)
+# -I dummy: No GUI
+# --vout drm_vout: Direct Rendering Manager (works on console/CLI without X11)
+# --no-osd: Clean output
+cvlc -I dummy --vout drm_vout --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 
 # Wait for VLC
 for i in {1..20}; do
