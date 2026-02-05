@@ -172,17 +172,22 @@ cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
 #!/bin/bash
 # ToastTV X11 Session
 # This script runs INSIDE the X session started by xinit
+# X is started as root, but VLC and app run as toasttv user
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
+APP_USER="toasttv"
+
+# Allow toasttv user to access this X display
+xhost +local:
 
 # Disable screen blanking / power saving
 xset -dpms
 xset s off
 xset s noblank
 
-# Start VLC fullscreen with RC interface
-cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
+# Start VLC fullscreen with RC interface (as non-root user)
+runuser -u $APP_USER -- cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 VLC_PID=$!
 
 # Wait for VLC RC interface
@@ -200,8 +205,8 @@ fi
 
 echo "VLC ready on port $VLC_PORT"
 
-# Start ToastTV app (this blocks until exit)
-$INSTALL_DIR/bin/toasttv
+# Start ToastTV app as non-root user (this blocks until exit)
+runuser -u $APP_USER -- $INSTALL_DIR/bin/toasttv
 
 # Cleanup VLC when app exits
 kill $VLC_PID 2>/dev/null
