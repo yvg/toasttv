@@ -67,11 +67,11 @@ describe('MediaService', () => {
     // 2. Outro (4)
     // 3. Alphabetical (2: apple, 5: beta, 1: zebra)
 
-    expect(sorted[0].id).toBe(3) // Intro
-    expect(sorted[1].id).toBe(4) // Outro
-    expect(sorted[2].id).toBe(2) // Apple
-    expect(sorted[3].id).toBe(5) // Beta
-    expect(sorted[4].id).toBe(1) // Zebra
+    expect(sorted[0]?.id).toBe(3) // Intro
+    expect(sorted[1]?.id).toBe(4) // Outro
+    expect(sorted[2]?.id).toBe(2) // Apple
+    expect(sorted[3]?.id).toBe(5) // Beta
+    expect(sorted[4]?.id).toBe(1) // Zebra
   })
 
   test('updateType() enforces singleton for intro', async () => {

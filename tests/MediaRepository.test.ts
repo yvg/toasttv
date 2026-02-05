@@ -43,15 +43,15 @@ describe('MediaRepository', () => {
 
     const all = await repo.getAll()
     expect(all).toHaveLength(1)
-    expect(all[0].filename).toBe('test.mp4')
-    expect(all[0].mediaType).toBe('video')
+    expect(all[0]?.filename).toBe('test.mp4')
+    expect(all[0]?.mediaType).toBe('video')
 
     // Update duration
     await repo.upsertMedia({ ...input, durationSeconds: 120 })
 
     const updated = await repo.getAll()
     expect(updated).toHaveLength(1)
-    expect(updated[0].durationSeconds).toBe(120)
+    expect(updated[0]?.durationSeconds).toBe(120)
   })
 
   test('getInterludes filters by date correctly', async () => {
@@ -123,7 +123,7 @@ describe('MediaRepository', () => {
     expect(removedCount).toBe(1)
     const all = await repo.getAll()
     expect(all).toHaveLength(1)
-    expect(all[0].path).toBe('/keep.mp4')
+    expect(all[0]?.path).toBe('/keep.mp4')
   })
 
   test('conflicting upsert preserves user settings', async () => {
@@ -139,7 +139,7 @@ describe('MediaRepository', () => {
     })
 
     // User manually changes to Interlude via method
-    const id = (await repo.getAll())[0].id
+    const id = (await repo.getAll())[0]?.id ?? 0
     await repo.toggleInterlude(id, true)
 
     // Re-scan (Upsert) as Video (file system says it's a video)
@@ -157,7 +157,7 @@ describe('MediaRepository', () => {
     // Logic: if excluded.is_interlude = 0 (Video), keep existing.
 
     const item = (await repo.getAll())[0]
-    expect(item.isInterlude).toBe(true)
-    expect(item.mediaType).toBe('interlude')
+    expect(item?.isInterlude).toBe(true)
+    expect(item?.mediaType).toBe('interlude')
   })
 })

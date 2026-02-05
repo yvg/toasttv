@@ -151,7 +151,8 @@ export class VlcClient implements IVlcController {
     const isPlaying = state === 'playing'
 
     // Extract current file path/URI
-    const inputMatch = statusResponse.match(/\( (?:new\s)?input: (.+) \)/)
+    // Use non-greedy match for input value to avoid capturing subsequent status groups
+    const inputMatch = statusResponse.match(/\( (?:new\s)?input: (.+?) \)/)
     const currentFile = inputMatch ? inputMatch[1] : null
 
     // get_time returns current position in seconds
