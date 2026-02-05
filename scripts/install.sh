@@ -105,13 +105,51 @@ mkdir -p $INSTALL_DIR/{data,media/videos,media/interludes}
 
 # Extract
 tar -xzf "$TMP_DIR/toasttv.tar.gz" -C $INSTALL_DIR
-mv $INSTALL_DIR/toasttv/toasttv $INSTALL_DIR/bin/toasttv
-mv $INSTALL_DIR/toasttv/public $INSTALL_DIR/public
-rm -rf $INSTALL_DIR/toasttv
 
-rm -rf "$TMP_DIR"
+# Install Binary
+mkdir -p $INSTALL_DIR/bin
+mv $INSTALL_DIR/toasttv/toasttv $INSTALL_DIR/bin/toasttv
 chmod +x $INSTALL_DIR/bin/toasttv
-log "Installed binary successfully"
+
+# Install Static Assets
+rm -rf $INSTALL_DIR/public
+mv $INSTALL_DIR/toasttv/public $INSTALL_DIR/public
+
+# Install/Seed Starter Media (Videos)
+mkdir -p $INSTALL_DIR/media/videos
+if [[ -z "$(ls -A $INSTALL_DIR/media/videos)" ]] && [[ -d "$INSTALL_DIR/toasttv/media/videos" ]]; then
+    log "Seeding Starter Videos (Caminandes)..."
+    cp $INSTALL_DIR/toasttv/media/videos/* $INSTALL_DIR/media/videos/
+else
+    log "Skipping Starter Videos (Library not empty)"
+fi
+
+# Install/Seed Starter Media (Interludes)
+mkdir -p $INSTALL_DIR/media/interludes
+if [[ -z "$(ls -A $INSTALL_DIR/media/interludes)" ]] && [[ -d "$INSTALL_DIR/toasttv/media/interludes" ]]; then
+    log "Seeding Starter Interludes (Penny & Chip)..."
+    cp $INSTALL_DIR/toasttv/media/interludes/* $INSTALL_DIR/media/interludes/
+else
+    log "Skipping Starter Interludes (Library not empty)"
+fi
+
+# Install/Seed Data (Config/Logo) - Only if missing
+mkdir -p $INSTALL_DIR/data
+if [[ -d "$INSTALL_DIR/toasttv/data" ]]; then
+    for file in "$INSTALL_DIR/toasttv/data"/*; do
+        filename=$(basename "$file")
+        if [[ ! -e "$INSTALL_DIR/data/$filename" ]]; then
+            log "Seeding default $filename..."
+            cp -r "$file" "$INSTALL_DIR/data/"
+        fi
+    done
+fi
+
+# Cleanup extracted folder
+rm -rf $INSTALL_DIR/toasttv
+rm -rf "$TMP_DIR"
+
+log "Installed binary & starter content successfully"
 
 # --- Create Launcher Script ---
 log "Creating launcher wrapper..."

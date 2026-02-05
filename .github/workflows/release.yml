@@ -39,6 +39,9 @@ jobs:
           # Copy binary + assets
           cp dist/toasttv release/toasttv/
           cp -r public release/toasttv/
+          cp -r media release/toasttv/
+          # Copy data (config/logo) but exclude ignores
+          cp -r data release/toasttv/
           
           # Include useful scripts just in case
           mkdir -p release/toasttv/scripts
