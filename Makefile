@@ -1,21 +1,22 @@
 # ToastTV Makefile
 
-.PHONY: install start dev test typecheck clean help vlc
+.PHONY: install start dev test typecheck clean help mpv
 
 # Auto-detect bun
 BUN := $(shell command -v bun 2>/dev/null || echo "$$HOME/.bun/bin/bun")
 
-# Auto-detect VLC
-VLC := $(shell command -v vlc 2>/dev/null || echo "/Applications/VLC.app/Contents/MacOS/VLC")
+# Auto-detect MPV
+MPV := $(shell command -v mpv 2>/dev/null || echo "/opt/homebrew/bin/mpv")
+MPV_SOCKET := /tmp/toasttv-mpv.sock
 
 help:
 	@echo "ToastTV Commands:"
-	@echo "  make install    - Install Bun + dependencies"
-	@echo "  make start      - Start VLC + daemon"
+	@echo "  make install    - Install Bun + dependencies (mpv, ffmpeg)"
+	@echo "  make start      - Start MPV + daemon"
 	@echo "  make dev        - Start with watch mode"
 	@echo "  make test       - Run unit tests"
 	@echo "  make typecheck  - Run TypeScript type checking"
-	@echo "  make vlc        - Start VLC with RC interface"
+	@echo "  make mpv        - Start MPV daemon locally"
 	@echo "  make clean      - Remove build artifacts"
 
 install:
@@ -24,15 +25,15 @@ install:
 		echo "Installing Bun..."; \
 		curl -fsSL https://bun.sh/install | bash; \
 	fi
-	@# Install VLC if needed
-	@if ! command -v vlc >/dev/null 2>&1 && [ ! -f "$(VLC)" ]; then \
-		echo "Installing VLC..."; \
+	@# Install MPV if needed
+	@if ! command -v mpv >/dev/null 2>&1; then \
+		echo "Installing MPV..."; \
 		if command -v brew >/dev/null 2>&1; then \
-			brew install --cask vlc; \
+			brew install mpv; \
 		elif command -v apt-get >/dev/null 2>&1; then \
-			sudo apt-get update && sudo apt-get install -y vlc; \
+			sudo apt-get update && sudo apt-get install -y mpv; \
 		else \
-			echo "❌ VLC not found. Install manually."; \
+			echo "❌ MPV not found. Install manually."; \
 			exit 1; \
 		fi; \
 	fi
@@ -51,20 +52,19 @@ install:
 	@$(BUN) install
 	@mkdir -p media/videos media/interludes data
 
-vlc:
-	@if pgrep -x vlc >/dev/null; then \
-		echo "VLC already running"; \
+mpv:
+	@if pgrep -x mpv >/dev/null; then \
+		echo "MPV already running"; \
 	else \
-		echo "Starting VLC with RC interface..."; \
-		LOGO_ARGS=$$($(BUN) scripts/vlc-logo-args.ts); \
-		$(VLC) --extraintf rc --rc-host localhost:9999 $$LOGO_ARGS &>/dev/null & \
+		echo "Starting MPV daemon..."; \
+		$(MPV) --idle --input-ipc-server=$(MPV_SOCKET) --no-terminal &>/dev/null & \
 		sleep 1; \
 	fi
 
-start: vlc
+start: mpv
 	@$(BUN) run src/main.ts
 
-dev: vlc
+dev: mpv
 	@$(BUN) --watch run src/main.ts
 
 test:
@@ -75,4 +75,4 @@ typecheck:
 
 clean:
 	@rm -rf node_modules .bun data/media.db
-	@pkill -x vlc 2>/dev/null || true
+	@pkill -x mpv 2>/dev/null || true

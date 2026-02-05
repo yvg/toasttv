@@ -41,7 +41,7 @@ export function createServer(daemon: ToastTVDaemon): ServerResult {
   )
 
   const playbackService = new PlaybackService({
-    vlc: daemon.getVlc(),
+    player: daemon.getPlayer(),
     engine: daemon.getEngine(),
     config: configService,
     media: daemon.getRepository(),

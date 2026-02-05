@@ -60,9 +60,8 @@ export function createSettingsController(deps: SettingsControllerDeps) {
         enabled: body['interludeEnabled'] === 'true',
         frequency: parseInt(body['interludeFrequency'] as string, 10) || 3,
       },
-      vlc: {
-        host: (body['vlcHost'] as string) || 'localhost',
-        port: parseInt(body['vlcPort'] as string, 10) || 8080,
+      mpv: {
+        ipcSocket: (body['mpvSocket'] as string) || '/tmp/toasttv-mpv.sock',
       },
       logo: {
         enabled: body['logoEnabled'] === 'true',

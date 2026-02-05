@@ -34,9 +34,7 @@ describe('ConfigRepository', () => {
       'server.port': '8080',
       'session.limitMinutes': '120',
       'interlude.enabled': 'false',
-      'vlc.host': '192.168.1.5',
-      'logo.opacity': '255',
-      'vlc.port': '9999',
+      'mpv.ipcSocket': '/tmp/test.sock',
       'session.resetHour': '6',
       'interlude.frequency': '1',
       'logo.enabled': 'true',
@@ -50,8 +48,8 @@ describe('ConfigRepository', () => {
     expect(config.server.port).toBe(8080)
     expect(config.session.limitMinutes).toBe(120)
     expect(config.interlude.enabled).toBe(false)
-    expect(config.vlc.host).toBe('192.168.1.5')
-    expect(config.logo.opacity).toBe(255)
+    expect(config.mpv.ipcSocket).toBe('/tmp/test.sock')
+    expect(config.logo.opacity).toBe(128)
   })
 
   test('update() saves partial changes to flat settings', async () => {
@@ -94,6 +92,9 @@ describe('ConfigRepository', () => {
       'session.limitMinutes',
       '30'
     )
-    expect(mediaRepo.setSetting).toHaveBeenCalledWith('vlc.port', '9999')
+    expect(mediaRepo.setSetting).toHaveBeenCalledWith(
+      'mpv.ipcSocket',
+      '/tmp/toasttv-mpv.sock'
+    )
   })
 })

@@ -1,52 +1,60 @@
 /**
- * VlcClient Tests
+ * MpvClient Tests
  *
  * Tests connection logic and status parsing by mocking Bun.connect.
+ * Tests for MpvClient.
  */
 
 import { describe, expect, test, spyOn, beforeEach, afterEach } from 'bun:test'
-import { VlcClient, VlcConnectionError } from '../src/clients/VlcClient'
+import { MpvClient } from '../src/clients/MpvClient'
 import type { Socket, SocketHandler } from 'bun'
 
-describe('VlcClient', () => {
-  let client: VlcClient
+describe('MpvClient', () => {
+  let client: MpvClient
   let mockSocket: any
   let socketHandler: SocketHandler<any> | undefined
   let connectSpy: any
 
   const CONFIG = {
-    host: 'localhost',
-    port: 4212,
-    password: 'test',
+    ipcSocket: '/tmp/test.sock',
     maxReconnectAttempts: 2,
     reconnectDelayMs: 10,
   }
 
   beforeEach(() => {
     // Reset state
-    client = new VlcClient(CONFIG)
+    client = new MpvClient(CONFIG)
     mockSocket = {
       write: (data: string) => {
-        // Determine response based on command
-        const cmd = data.trim()
-        let response = ''
+        // Parse JSON IPC Request
+        const payload = JSON.parse(data)
+        const request_id = payload.request_id
+        const command = payload.command // ["get_property", "pause"]
 
-        if (cmd === 'status') {
-          response =
-            '( new input: file:///videos/test.mp4 ) ( audio volume: 100 ) ( state playing )'
-        } else if (cmd === 'get_time') {
-          response = '120'
-        } else if (cmd === 'get_length') {
-          response = '600'
-        } else if (cmd === 'get_title') {
-          response = 'test.mp4'
-        } else {
-          response = '>'
+        let responseData: any = null
+        let error = 'success'
+
+        if (command && command[0] === 'get_property') {
+          const prop = command[1]
+          if (prop === 'pause') responseData = false
+          else if (prop === 'path') responseData = '/videos/test.mp4'
+          else if (prop === 'time-pos') responseData = 120
+          else if (prop === 'duration') responseData = 600
+          else if (prop === 'idle-active') responseData = false
+        }
+
+        const responseIdx = {
+          request_id,
+          error,
+          data: responseData,
         }
 
         // Simulate incoming data
         if (socketHandler?.data) {
-          socketHandler.data(mockSocket, Buffer.from(response + '\r\n> '))
+          socketHandler.data(
+            mockSocket,
+            Buffer.from(JSON.stringify(responseIdx) + '\n')
+          )
         }
       },
       end: () => {
@@ -56,7 +64,7 @@ describe('VlcClient', () => {
 
     // Spy on Bun.connect
     connectSpy = spyOn(Bun, 'connect').mockImplementation((options: any) => {
-      // Capture the handler provided by VlcClient
+      // Capture the handler provided by MpvClient
       socketHandler = options.socket
 
       // Simulate async connection success
@@ -66,7 +74,6 @@ describe('VlcClient', () => {
         }
       }, 0)
 
-      // Return dummy promise/socket (not actually used by VlcClient logic which relies on callbacks)
       return Promise.resolve(mockSocket)
     })
   })
@@ -87,12 +94,11 @@ describe('VlcClient', () => {
     })
 
     // Should throw after retries
-    // Note: VlcClient logic catches error from attemptConnection promise rejection
     try {
       await client.connect()
       expect(true).toBe(false) // Should fail
-    } catch (e) {
-      expect(e).toBeInstanceOf(VlcConnectionError)
+    } catch (e: any) {
+      expect(e.message).toContain('Failed to connect')
     }
 
     // 2 attempts = 2 calls
@@ -104,14 +110,14 @@ describe('VlcClient', () => {
     expect(client.isConnected).toBe(true)
   })
 
-  test('getStatus() parses valid VLC response', async () => {
+  test('getStatus() parses valid MPV response', async () => {
     await client.connect()
 
     const status = await client.getStatus()
 
-    expect(status.isPlaying).toBe(true)
+    expect(status.isPlaying).toBe(true) // pause=false, idle=false
     expect(status.state).toBe('playing')
-    expect(status.currentFile).toBe('file:///videos/test.mp4')
+    expect(status.currentFile).toBe('/videos/test.mp4')
     expect(status.positionSeconds).toBe(120)
     expect(status.durationSeconds).toBe(600)
   })
@@ -119,15 +125,26 @@ describe('VlcClient', () => {
   test('getStatus() handles paused state', async () => {
     // Adjust mock behavior for this test
     mockSocket.write = (data: string) => {
-      const cmd = data.trim()
-      let response = ''
-      if (cmd === 'status') {
-        response = '( state paused )'
-      } else {
-        response = '0'
+      const payload = JSON.parse(data)
+      const request_id = payload.request_id
+      const command = payload.command
+
+      let responseData: any = null
+
+      if (command && command[0] === 'get_property') {
+        const prop = command[1]
+        if (prop === 'pause')
+          responseData = true // PAUSED
+        else if (prop === 'path') responseData = '/videos/test.mp4'
+        else responseData = 0
       }
+
+      const responseIdx = { request_id, error: 'success', data: responseData }
       if (socketHandler?.data)
-        socketHandler.data(mockSocket, Buffer.from(response))
+        socketHandler.data(
+          mockSocket,
+          Buffer.from(JSON.stringify(responseIdx) + '\n')
+        )
     }
 
     await client.connect()

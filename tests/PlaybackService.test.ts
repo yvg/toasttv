@@ -1,14 +1,14 @@
 /**
  * PlaybackService Tests
  *
- * Tests for playback control and VLC interaction.
+ * Tests for playback control and Player interaction.
  */
 
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { mock, type MockProxy } from 'jest-mock-extended'
 import { PlaybackService } from '../src/services/PlaybackService'
 import type { PlaylistEngine } from '../src/services/PlaylistEngine'
-import type { IVlcController, MediaItem, PlaybackStatus } from '../src/types'
+import type { IMediaPlayer, MediaItem, PlaybackStatus } from '../src/types'
 import type { ConfigService } from '../src/services/ConfigService'
 import type { IMediaRepository } from '../src/repositories/IMediaRepository'
 import type { DashboardEventService } from '../src/services/DashboardEventService'
@@ -27,7 +27,7 @@ const createMediaItemBuilder = (override?: Partial<MediaItem>): MediaItem => ({
 })
 
 describe('PlaybackService', () => {
-  let vlc: MockProxy<IVlcController>
+  let player: MockProxy<IMediaPlayer>
   let engine: MockProxy<PlaylistEngine>
   let config: MockProxy<ConfigService>
   let media: MockProxy<IMediaRepository>
@@ -35,20 +35,21 @@ describe('PlaybackService', () => {
   let service: PlaybackService
 
   beforeEach(() => {
-    vlc = mock<IVlcController>()
+    player = mock<IMediaPlayer>()
     engine = mock<PlaylistEngine>()
     config = mock<ConfigService>()
     media = mock<IMediaRepository>()
     events = mock<DashboardEventService>()
 
     // Default setups
-    vlc.connect.mockResolvedValue()
-    vlc.disconnect.mockResolvedValue()
-    vlc.play.mockResolvedValue()
-    vlc.pause.mockResolvedValue()
-    vlc.stop.mockResolvedValue()
-    vlc.setLoop.mockResolvedValue()
-    vlc.enqueue.mockResolvedValue()
+    // Default setups
+    player.connect.mockResolvedValue()
+    player.disconnect.mockResolvedValue()
+    player.play.mockResolvedValue()
+    player.pause.mockResolvedValue()
+    player.stop.mockResolvedValue()
+    player.setLoop.mockResolvedValue()
+    player.enqueue.mockResolvedValue()
 
     // Default engine state
     // @ts-ignore
@@ -64,7 +65,7 @@ describe('PlaybackService', () => {
       session: { offAirAssetId: null },
     } as any)
 
-    service = new PlaybackService({ vlc, engine, config, media, events })
+    service = new PlaybackService({ player, engine, config, media, events })
   })
 
   test('startSession() starts engine and plays first video', async () => {
@@ -75,8 +76,8 @@ describe('PlaybackService', () => {
     await service.startSession()
 
     expect(engine.startSession).toHaveBeenCalled()
-    expect(vlc.play).toHaveBeenCalledWith(video.path)
-    expect(vlc.setLoop).toHaveBeenCalledWith(false)
+    expect(player.play).toHaveBeenCalledWith(video.path)
+    expect(player.setLoop).toHaveBeenCalledWith(false)
     expect(events.broadcast).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'sessionStart',
@@ -93,14 +94,14 @@ describe('PlaybackService', () => {
     expect(engine.startSession).not.toHaveBeenCalled()
   })
 
-  test('endSession() stops VLC and ends engine session', async () => {
+  test('endSession() stops player and ends engine session', async () => {
     // @ts-ignore
     engine.isSessionActive = true
 
     await service.endSession()
 
     expect(engine.endSession).toHaveBeenCalled()
-    expect(vlc.stop).toHaveBeenCalled()
+    expect(player.stop).toHaveBeenCalled()
     expect(events.broadcast).toHaveBeenCalledWith({ type: 'sessionEnd' })
   })
 
@@ -112,11 +113,11 @@ describe('PlaybackService', () => {
     await service.skip()
 
     expect(engine.getNextVideo).toHaveBeenCalled()
-    expect(vlc.play).toHaveBeenCalledWith(nextVideo.path)
+    expect(player.play).toHaveBeenCalledWith(nextVideo.path)
   })
 
-  test('pause() delegates to VLC and broadcasts state', async () => {
-    vlc.getStatus.mockResolvedValue({
+  test('pause() delegates to Player and broadcasts state', async () => {
+    player.getStatus.mockResolvedValue({
       isPlaying: false,
       currentFile: 'test.mp4',
       positionSeconds: 10,
@@ -126,19 +127,19 @@ describe('PlaybackService', () => {
 
     await service.pause()
 
-    expect(vlc.pause).toHaveBeenCalled()
+    expect(player.pause).toHaveBeenCalled()
     expect(events.broadcastPlayingState).toHaveBeenCalledWith(false)
   })
 
-  test('stop() stops VLC and ends session', async () => {
+  test('stop() stops Player and ends session', async () => {
     await service.stop()
 
-    expect(vlc.stop).toHaveBeenCalled()
+    expect(player.stop).toHaveBeenCalled()
     expect(engine.endSession).toHaveBeenCalled()
     expect(events.broadcast).toHaveBeenCalledWith({ type: 'sessionEnd' })
   })
 
-  test('getStatus() returns VLC status', async () => {
+  test('getStatus() returns Player status', async () => {
     const status: PlaybackStatus = {
       isPlaying: true,
       currentFile: '/media/show.mp4',
@@ -146,15 +147,15 @@ describe('PlaybackService', () => {
       durationSeconds: 600,
       state: 'playing',
     }
-    vlc.getStatus.mockResolvedValue(status)
+    player.getStatus.mockResolvedValue(status)
 
     const result = await service.getStatus()
 
     expect(result).toEqual(status)
   })
 
-  test('getStatus() returns null on VLC error', async () => {
-    vlc.getStatus.mockRejectedValue(new Error('VLC not connected'))
+  test('getStatus() returns null on Player error', async () => {
+    player.getStatus.mockRejectedValue(new Error('Player not connected'))
 
     const result = await service.getStatus()
 

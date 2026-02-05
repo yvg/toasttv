@@ -35,7 +35,7 @@ describe('SettingsController', () => {
     formData.append('sessionLimit', '120')
     formData.append('interludeEnabled', 'true')
     formData.append('interludeFrequency', '2')
-    formData.append('vlcHost', '10.0.0.1')
+    formData.append('mpvSocket', '/tmp/updated.sock')
     formData.append('logoOpacity', '255')
 
     const req = new Request('http://localhost/api/config', {
@@ -53,7 +53,7 @@ describe('SettingsController', () => {
         server: { port: 8080 },
         session: expect.objectContaining({ limitMinutes: 120 }),
         interlude: { enabled: true, frequency: 2 },
-        vlc: expect.objectContaining({ host: '10.0.0.1' }),
+        mpv: expect.objectContaining({ ipcSocket: '/tmp/updated.sock' }),
         logo: expect.objectContaining({ opacity: 255 }),
       })
     )

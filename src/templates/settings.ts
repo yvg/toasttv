@@ -1,7 +1,7 @@
 /**
  * Settings Template
  *
- * Configuration page for session, interlude, VLC, and logo settings.
+ * Configuration page for session, interlude, MPV, and logo settings.
  * Uses pure HTMX for form submission and logo upload - no extensions.
  */
 
@@ -107,20 +107,16 @@ export function renderSettings(props: SettingsProps): string {
             </div>
           </section>
           
-          <!-- VLC Connection Card -->
+          <!-- Player Connection Card -->
           <section class="settings-card">
             <div class="card-header">
-              <h2>🔌 VLC Connection</h2>
+              <h2>🎞️ MPV Socket</h2>
             </div>
             
             <div class="form-row">
               <div class="form-group">
-                <label for="vlcHost">Host</label>
-                <input type="text" id="vlcHost" name="vlcHost" value="${config.vlc.host}">
-              </div>
-              <div class="form-group">
-                <label for="vlcPort">Port</label>
-                <input type="number" id="vlcPort" name="vlcPort" value="${config.vlc.port}" min="1" max="65535">
+                <label for="mpvSocket">IPC Socket Path</label>
+                <input type="text" id="mpvSocket" name="mpvSocket" value="${config.mpv.ipcSocket}">
               </div>
             </div>
           </section>

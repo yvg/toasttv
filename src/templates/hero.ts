@@ -67,7 +67,7 @@ function renderTvOff(): string {
 function renderTvOn(props: HeroProps): string {
   const { currentVideo, queue, sessionInfo } = props
 
-  // Default status when VLC is not responding
+  // Default status when Player is not responding
   const status = props.status ?? {
     isPlaying: false,
     currentFile: null,

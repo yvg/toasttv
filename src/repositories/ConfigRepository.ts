@@ -30,9 +30,8 @@ export interface AppConfig {
     enabled: boolean
     frequency: number
   }
-  vlc: {
-    host: string
-    port: number
+  mpv: {
+    ipcSocket: string
   }
   logo: {
     enabled: boolean
@@ -70,15 +69,14 @@ const DEFAULT_CONFIG: AppConfig = {
     enabled: true,
     frequency: 1,
   },
-  vlc: {
-    host: 'localhost',
-    port: 9999,
+  mpv: {
+    ipcSocket: '/tmp/toasttv-mpv.sock',
   },
   logo: {
     enabled: true,
     imagePath: './data/logo.png',
     opacity: 128,
-    position: 2,
+    position: 6, // Top-Right
     x: 8,
     y: 8,
   },
@@ -152,8 +150,7 @@ export class ConfigRepository {
       'interlude.frequency',
       DEFAULT_CONFIG.interlude.frequency.toString()
     )
-    await setIfMissing('vlc.host', DEFAULT_CONFIG.vlc.host)
-    await setIfMissing('vlc.port', DEFAULT_CONFIG.vlc.port.toString())
+    await setIfMissing('mpv.ipcSocket', DEFAULT_CONFIG.mpv.ipcSocket)
     await setIfMissing('logo.enabled', DEFAULT_CONFIG.logo.enabled.toString())
     await setIfMissing('logo.opacity', DEFAULT_CONFIG.logo.opacity.toString())
     await setIfMissing('logo.position', DEFAULT_CONFIG.logo.position.toString())
@@ -191,9 +188,8 @@ export class ConfigRepository {
         enabled: s['interlude.enabled'] === 'true',
         frequency: parseInt(s['interlude.frequency'] ?? '1', 10),
       },
-      vlc: {
-        host: s['vlc.host'] ?? 'localhost',
-        port: parseInt(s['vlc.port'] ?? '9999', 10),
+      mpv: {
+        ipcSocket: s['mpv.ipcSocket'] ?? '/tmp/toasttv-mpv.sock',
       },
       logo: {
         enabled: s['logo.enabled'] === 'true',
@@ -256,14 +252,9 @@ export class ConfigRepository {
         )
     }
 
-    if (partial.vlc) {
-      if (partial.vlc.host !== undefined)
-        await this.repository.setSetting('vlc.host', partial.vlc.host)
-      if (partial.vlc.port !== undefined)
-        await this.repository.setSetting(
-          'vlc.port',
-          partial.vlc.port.toString()
-        )
+    if (partial.mpv) {
+      if (partial.mpv.ipcSocket !== undefined)
+        await this.repository.setSetting('mpv.ipcSocket', partial.mpv.ipcSocket)
     }
 
     if (partial.logo) {

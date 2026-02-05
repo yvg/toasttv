@@ -40,7 +40,7 @@ One tap to "Sign Off" manually, or set automatic daily limits.
 - **Smart Channel Engine**: ToastTV builds a dynamic "Channel" schedule: `[Intro] → [Video] → [Video] → [Interlude] → [Video]`.
 - **Screen Time Limits**: Set a daily quota (e.g. 45 mins). When time is up, the station plays the sign-off sequence and stops. No arguments.
 - **Seasonal Awareness**: Christmas interludes in December, Spooky bumpers in October. The engine tracks dates automatically—zero config required.
-- **Native VLC Power**: Plays MKV, AVI, MP4 directly with hardware acceleration. No transcoding, no buffering, rock-solid sync.
+- **Native MPV Power**: Plays MKV, AVI, MP4 directly with hardware acceleration (DRM/KMS). No transcoding, no buffering, rock-solid sync.
 - **Living Room Ready**: Put the keyboard away. Use your **actual TV remote** (Play/Pause/Skip) via HDMI-CEC.
 
 ### Starter Content
@@ -67,8 +67,8 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for tech stack, and design decisions.
 ## Development
 
 ```bash
-make install   # Install Bun, VLC, FFmpeg
-make start     # Start VLC + server
+make install   # Install Bun, MPV, FFmpeg
+make start     # Start MPV + server
 make dev       # Start with watch mode
 make test      # Run tests
 ```

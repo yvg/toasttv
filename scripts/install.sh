@@ -16,7 +16,7 @@ REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}"
 INSTALL_DIR="/opt/toasttv"
 SERVICE_NAME="toasttv"
 APP_PORT=1993
-VLC_PORT=9999
+APP_PORT=1993
 
 # Colors
 RED='\033[0;31m'
@@ -79,11 +79,10 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 # --- Install System Dependencies ---
-log "Installing dependencies (VLC, FFmpeg, X11)..."
-# VLC + X11 for kiosk mode (headless video output)
-# xserver-xorg: metapackage including VIDEO DRIVERS (critical for Pi)
-apt-get install -y -qq vlc vlc-plugin-video-output ffmpeg curl \
-    xserver-xorg xinit x11-xserver-utils
+log "Installing dependencies (MPV, FFmpeg)..."
+# MPV for hardware-accelerated headless playback (DRM/KMS)
+# No X11 required!
+apt-get install -y -qq mpv socat curl ffmpeg
 
 # --- Create System User ---
 if id -u $SERVICE_NAME &>/dev/null; then
@@ -95,19 +94,14 @@ else
     useradd -r -s /bin/bash -d $INSTALL_DIR $SERVICE_NAME
 fi
 
-# Ensure permissions for audio/video/tty(for X11)
-log "Granting audio/video/tty permissions..."
-usermod -a -G audio,video,render,tty $SERVICE_NAME 2>/dev/null || usermod -a -G audio,video,tty $SERVICE_NAME
+# Ensure permissions for audio/video/render (for DRM/KMS)
+log "Granting audio/video/render permissions..."
+usermod -a -G audio,video,render $SERVICE_NAME
 
-# Configure X11 permissions for kiosk mode
-log "Configuring X11 wrapper permissions..."
-mkdir -p /etc/X11
-cat > /etc/X11/Xwrapper.config << XWRAP
-# Allow X server to start from systemd service
-allowed_users=anybody
-needs_root_rights=yes
-XWRAP
-
+# Remove legacy X11 hack if present
+if [ -f /etc/X11/Xwrapper.config ]; then
+    rm -f /etc/X11/Xwrapper.config
+fi
 # --- Install Application ---
 log "Downloading ToastTV $VERSION..."
 TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
@@ -169,89 +163,45 @@ rm -rf "$TMP_DIR"
 log "Installed binary & starter content successfully"
 
 
-# --- Create X11 Session Script (Mixed Privileges) ---
-log "Creating X11 session script..."
-cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
+# --- Create Launcher Script (MPV + App) ---
+log "Creating launcher script..."
+cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
 #!/bin/bash
-# ToastTV X11 Session
-# Runs INSIDE X server.
-# Executed as ROOT (because xinit runs as root).
+# ToastTV Launcher (MPV + Node)
 
 INSTALL_DIR="/opt/toasttv"
-VLC_PORT=9999
-APP_USER="toasttv"
+MPV_SOCKET="/tmp/toasttv-mpv.sock"
 
-# 1. Allow 'toasttv' user to connect to this root-owned X display
-xhost +si:localuser:$APP_USER
+# 1. Start MPV in background
+# --idle: Keep running without media
+# --input-ipc-server: Socket for control
+# --vo=gpu --gpu-context=drm: Native hardware output via helper (requires rpi-mmal or standard drm)
+# Note: On standard Debian/Pi, --vo=gpu --gpu-context=drm is standard. 
+#       If that fails, --vo=drm is fallback.
+echo "Starting MPV daemon..."
+mpv --idle --input-ipc-server=$MPV_SOCKET --vo=gpu --gpu-context=drm --hwdec=auto --no-terminal &
+MPV_PID=$!
 
-# 2. Disable power saving (as root, applies to display)
-xset -dpms
-xset s off
-xset s noblank
-
-# 3. Start VLC as toasttv user
-# -l: login shell ensures HOME=/opt/toasttv so VLC finds its config
-# & at end of command string runs it in background of the user shell? 
-# Actually simpler: runuser -u toasttv command &
-# But we need HOME variables.
-# We will explicitly set HOME to avoid login shell complexities with backgrounding
-
-export HOME=$(getent passwd $APP_USER | cut -d: -f6)
-
-echo "Starting VLC as $APP_USER (HOME=$HOME)..."
-runuser -u $APP_USER -- cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
-VLC_PID=$!
-
-# Wait for VLC RC interface
+# Wait for socket
+echo "Waiting for MPV socket..."
 for i in {1..20}; do
-    if nc -z localhost $VLC_PORT 2>/dev/null; then
-        break
+    if [ -S $MPV_SOCKET ]; then 
+        echo "MPV socket ready."
+        break 
     fi
     sleep 0.5
 done
 
-if ! nc -z localhost $VLC_PORT 2>/dev/null; then
-    echo "ERROR: VLC RC interface not responding"
-    # Try logging why
-    ps aux | grep vlc
-    exit 1
-fi
+# 2. Start ToastTV App
+echo "Starting ToastTV App..."
+$INSTALL_DIR/bin/toasttv
 
-echo "VLC ready on port $VLC_PORT"
-
-# 4. Start ToastTV app as toasttv user
-# This blocks until app exits
-echo "Starting ToastTV..."
-runuser -u $APP_USER -- $INSTALL_DIR/bin/toasttv
-
-# Cleanup
-kill $VLC_PID 2>/dev/null
-XSESSION
-
-chmod +x $INSTALL_DIR/bin/toasttv-session
-
-# --- Create Launcher Script (ROOT) ---
-log "Creating X11 kiosk launcher..."
-cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
-#!/bin/bash
-# Starts Xorg as ROOT (to access TTY/GPU)
-# Session script handles dropping privileges for Clients
-
-INSTALL_DIR="/opt/toasttv"
-
-# Ensure we are root
-if [ "$(id -u)" -ne 0 ]; then
-   echo "Must run as root"
-   exit 1
-fi
-
-# Start X11
-# - :0 vt1: Display 0 on TTY1
-exec xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp
+# Cleanup when app exits
+echo "Stopping MPV..."
+kill $MPV_PID 2>/dev/null
 LAUNCHER
 
 chmod +x $INSTALL_DIR/bin/start-toasttv
-
 chmod +x $INSTALL_DIR/bin/toasttv
 
 # --- Create Systemd Service ---
@@ -260,24 +210,19 @@ cat > /etc/systemd/system/${SERVICE_NAME}.service << SERVICE
 [Unit]
 Description=ToastTV - Retro TV Experience
 Documentation=https://github.com/${REPO_OWNER}/${REPO_NAME}
-After=network.target
+After=network.target sound.target
 
 [Service]
 Type=simple
-User=root
-Group=root
+User=$SERVICE_NAME
+Group=$SERVICE_NAME
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/bin/start-toasttv
 Restart=on-failure
 RestartSec=5
 
-# X11 requires access to virtual terminal
-TTYPath=/dev/tty1
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
-
 Environment=NODE_ENV=production
+# Add other env vars here if needed
 Environment=TOASTTV_DATA=$INSTALL_DIR/data
 Environment=TOASTTV_MEDIA=$INSTALL_DIR/media
 

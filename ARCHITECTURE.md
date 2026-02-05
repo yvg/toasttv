@@ -5,7 +5,7 @@
 - **Runtime:** Bun 1.3+
 - **Framework:** Hono (HTTP)
 - **Database:** SQLite (via bun:sqlite)
-- **Playback:** VLC (telnet control)
+- **Playback:** MPV (JSON IPC via Socket)
 - **UI:** HTMX + Server-rendered HTML
 
 ## Layer Structure
@@ -27,7 +27,7 @@ src/
 ├── controllers/         # HTTP handlers
 ├── services/            # Business logic
 ├── repositories/        # SQLite access
-├── clients/             # VLC, FFmpeg, CEC
+├── clients/             # MPV, FFmpeg, CEC
 ├── templates/           # HTML rendering
 └── types.ts             # Shared types
 ```
@@ -48,7 +48,7 @@ src/
 2. **Controllers are thin** — Delegate to services
 3. **Services don't call controllers** — One-way dependency
 4. **Repositories don't contain business logic** — Pure data access
-5. **Clients are stateless** — VLC, FFmpeg wrappers
+5. **Clients are stateless** — MPV, FFmpeg wrappers
 
 ## Data Flow
 
@@ -57,7 +57,7 @@ src/
                     ↓
             PlaylistEngine → Queue
                     ↓
-            PlaybackService → VLC → HDMI
+            PlaybackService → MPV → HDMI
 ```
 
 ## Config

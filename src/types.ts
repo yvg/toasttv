@@ -30,9 +30,8 @@ export interface PlaybackStatus {
 
 // --- Configuration ---
 
-export interface VlcConfig {
-  readonly host: string
-  readonly port: number
+export interface PlayerConfig {
+  readonly ipcSocket: string
   readonly reconnectDelayMs: number
   readonly maxReconnectAttempts: number
 }
@@ -53,6 +52,8 @@ export interface LogoConfig {
   readonly filePath: string | null
   readonly opacity: number
   readonly position: number
+  readonly x?: number
+  readonly y?: number
 }
 
 export interface MediaConfig {
@@ -62,7 +63,7 @@ export interface MediaConfig {
 }
 
 export interface ToastTVConfig {
-  readonly vlc: VlcConfig
+  readonly mpv: PlayerConfig
   readonly media: MediaConfig
   readonly session: SessionConfig
   readonly interlude: InterludeConfig
@@ -71,17 +72,20 @@ export interface ToastTVConfig {
 
 // --- Interfaces for DI ---
 
-export interface IVlcController {
+export interface IMediaPlayer {
+  readonly isConnected: boolean
   connect(): Promise<void>
   disconnect(): Promise<void>
+
   play(path: string): Promise<void>
+  enqueue(path: string): Promise<void>
+  clear(): Promise<void>
   pause(): Promise<void>
   stop(): Promise<void>
   next(): Promise<void>
-  enqueue(path: string): Promise<void>
-  clear(): Promise<void>
   setLoop(enabled: boolean): Promise<void>
   getStatus(): Promise<PlaybackStatus>
+  updateLogo(config: LogoConfig): Promise<void>
 }
 
 export interface IFileSystem {

@@ -1,7 +1,7 @@
 /**
  * ToastTV Main Entry Point
  *
- * Starts both the daemon (VLC control) and the web server (admin UI).
+ * Starts both the daemon (media player control) and the web server (admin UI).
  */
 
 import { ToastTVDaemon } from './daemon'

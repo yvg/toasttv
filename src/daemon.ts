@@ -10,7 +10,7 @@ import type { AppConfig, DeepPartial } from './repositories/ConfigRepository'
 import { MediaRepository } from './repositories/MediaRepository'
 import { FilesystemClient } from './clients/FilesystemClient'
 import { FFProbeClient } from './clients/FilesystemClient'
-import { VlcClient } from './clients/VlcClient'
+import { MpvClient } from './clients/MpvClient'
 import { CECClient, CEC_KEYS } from './clients/CECClient'
 import { MediaIndexer } from './services/MediaIndexer'
 import {
@@ -19,14 +19,14 @@ import {
 } from './services/PlaylistEngine'
 import { SessionManager } from './services/SessionManager'
 import { ConfigService } from './services/ConfigService'
-import { type MediaItem, type ToastTVConfig } from './types'
+import { type MediaItem, type ToastTVConfig, type IMediaPlayer } from './types'
 
 export class ToastTVDaemon {
   private running = false
 
   private readonly appConfig: ConfigRepository
   private repository: MediaRepository | null = null
-  private vlc: VlcClient | null = null
+  private player: IMediaPlayer | null = null
   private indexer: MediaIndexer | null = null
   private engine: PlaylistEngine | null = null
 
@@ -68,9 +68,9 @@ export class ToastTVDaemon {
     return this.indexer
   }
 
-  getVlc(): VlcClient {
-    if (!this.vlc) throw new Error('Daemon not started')
-    return this.vlc
+  getPlayer(): IMediaPlayer {
+    if (!this.player) throw new Error('Daemon not started')
+    return this.player
   }
 
   getEngine(): PlaylistEngine {
@@ -95,12 +95,13 @@ export class ToastTVDaemon {
     const runtimeConfig = await this.appConfig.get()
 
     // 3. Initialize Services
-    const vlcConfig = {
-      ...runtimeConfig.vlc,
+    const playerConfig = {
+      ...runtimeConfig.mpv,
       reconnectDelayMs: 2000,
       maxReconnectAttempts: 10,
     }
-    this.vlc = new VlcClient(vlcConfig)
+    // Switch to MpvClient (implements IMediaPlayer)
+    this.player = new MpvClient(playerConfig)
 
     const filesystem = new FilesystemClient()
     const mediaProbe = new FFProbeClient()
@@ -141,10 +142,19 @@ export class ToastTVDaemon {
     const allMedia = await this.repository.getAll()
     await configService.discoverSpecialMedia(allMedia)
 
-    await this.vlc.connect()
+    await this.player.connect()
 
-    // NOTE: Logo settings are applied at VLC launch time via command-line args
-    // VLC 3.0's RC interface does not support runtime logo control
+    // Apply logo settings
+    if (runtimeConfig.logo) {
+      // Map AppConfig structure (imagePath) to LogoConfig structure (filePath)
+      await this.player.updateLogo({
+        filePath: runtimeConfig.logo.imagePath,
+        opacity: runtimeConfig.logo.opacity,
+        position: runtimeConfig.logo.position,
+        x: runtimeConfig.logo.x,
+        y: runtimeConfig.logo.y,
+      })
+    }
 
     // Try to start CEC listener (optional, may not be available on all systems)
     try {
@@ -158,10 +168,10 @@ export class ToastTVDaemon {
   }
 
   private async initializeCEC(): Promise<void> {
-    if (!this.vlc || !this.engine) return
+    if (!this.player || !this.engine) return
     const cec = new CECClient()
     const engine = this.engine
-    const vlc = this.vlc
+    const player = this.player
 
     // Map remote buttons to actions
     cec.onPowerOn(() => {
@@ -174,7 +184,7 @@ export class ToastTVDaemon {
     })
 
     cec.onKeyPress(CEC_KEYS.PAUSE, () => {
-      void vlc.pause()
+      void player.pause()
     })
 
     cec.onKeyPress(CEC_KEYS.STOP, () => {
@@ -188,7 +198,7 @@ export class ToastTVDaemon {
     cec.onKeyPress(CEC_KEYS.SELECT, () => {
       // Toggle play/pause
       if (engine.isSessionActive) {
-        void vlc.pause()
+        void player.pause()
       } else {
         void engine.startSession()
       }
@@ -206,15 +216,15 @@ export class ToastTVDaemon {
       await this.engine.endSession()
     }
 
-    if (this.vlc) {
+    if (this.player) {
       try {
-        await this.vlc.stop()
+        await this.player.stop()
       } catch (e) {
         /* ignore */
       }
 
       try {
-        await this.vlc.disconnect()
+        await this.player.disconnect()
       } catch (e) {
         /* ignore */
       }

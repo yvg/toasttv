@@ -1,20 +1,19 @@
 /**
  * Playback Service
  *
- * Handles session control, VLC playback, and the playback loop.
- * Delegates to VlcClient and PlaylistEngine.
+ * Handles session control, player playback, and the playback loop.
+ * Delegates to MpvClient (via IMediaPlayer) and PlaylistEngine.
  */
 
 import type { PlaylistEngine } from './PlaylistEngine'
-import type { MediaItem, PlaybackStatus, IVlcController } from '../types'
+import type { MediaItem, PlaybackStatus, IMediaPlayer } from '../types'
 import type { DashboardEventService } from './DashboardEventService'
 import type { ConfigService } from './ConfigService'
 import type { IMediaRepository } from '../repositories/IMediaRepository'
 import { logger } from '../utils/logger'
-import { VlcConnectionError } from '../clients/VlcClient'
 
 export interface PlaybackServiceDeps {
-  vlc: IVlcController
+  player: IMediaPlayer
   engine: PlaylistEngine
   config: ConfigService
   media: IMediaRepository
@@ -26,14 +25,14 @@ export class PlaybackService {
   private running = false
   private offAirMode = false
 
-  private readonly vlc: IVlcController
+  private readonly player: IMediaPlayer
   private readonly engine: PlaylistEngine
   private readonly config: ConfigService
   private readonly media: IMediaRepository
   private readonly events?: DashboardEventService
 
   constructor(deps: PlaybackServiceDeps) {
-    this.vlc = deps.vlc
+    this.player = deps.player
     this.engine = deps.engine
     this.config = deps.config
     this.media = deps.media
@@ -82,7 +81,7 @@ export class PlaybackService {
 
     if (this.offAirMode) {
       this.offAirMode = false
-      await this.vlc.setLoop(false)
+      await this.player.setLoop(false)
 
       // Start a fresh session
       const firstVideo = await this.engine.startSession()
@@ -103,7 +102,7 @@ export class PlaybackService {
         // Pre-queue second video for gapless playback
         const secondVideo = this.engine.peekQueue(1)[0]
         if (secondVideo) {
-          await this.vlc.enqueue(secondVideo.path)
+          await this.player.enqueue(secondVideo.path)
           logger.info(`Pre-queued: ${secondVideo.filename}`)
         }
       }
@@ -132,8 +131,8 @@ export class PlaybackService {
       return
     }
 
-    // Ensure VLC loop is disabled for normal session
-    await this.vlc.setLoop(false)
+    // Ensure Player loop is disabled for normal session
+    await this.player.setLoop(false)
 
     // Exit off-air mode if active
     this.offAirMode = false
@@ -166,7 +165,7 @@ export class PlaybackService {
    */
   async endSession(): Promise<void> {
     await this.engine.endSession()
-    await this.vlc.stop()
+    await this.player.stop()
     this.events?.resetPlayingState()
     this.events?.broadcast({ type: 'sessionEnd' })
     console.log('Session ended')
@@ -196,9 +195,9 @@ export class PlaybackService {
    * Pause playback
    */
   async pause(): Promise<void> {
-    await this.vlc.pause()
+    await this.player.pause()
     // Check actual state and emit
-    const status = await this.vlc.getStatus()
+    const status = await this.player.getStatus()
     this.events?.broadcastPlayingState(status.isPlaying)
   }
 
@@ -206,7 +205,7 @@ export class PlaybackService {
    * Stop playback and end session
    */
   async stop(): Promise<void> {
-    await this.vlc.stop()
+    await this.player.stop()
     await this.engine.endSession()
     this.offAirMode = false
     this.events?.resetPlayingState()
@@ -216,11 +215,11 @@ export class PlaybackService {
   // --- Status ---
 
   /**
-   * Get current playback status from VLC
+   * Get current playback status from player
    */
   async getStatus(): Promise<PlaybackStatus | null> {
     try {
-      return await this.vlc.getStatus()
+      return await this.player.getStatus()
     } catch {
       return null
     }
@@ -269,7 +268,7 @@ export class PlaybackService {
 
   private async playVideo(video: MediaItem): Promise<void> {
     this.currentVideo = video
-    await this.vlc.play(video.path)
+    await this.player.play(video.path)
 
     // Emit track start event with updated queue
     const queue = this.peekQueue(10).map((v) => ({
@@ -287,10 +286,10 @@ export class PlaybackService {
 
     // PRE-QUEUE NEXT
     // When manually playing a video (start/skip), we must ensure the NEXT video is queued
-    // otherwise VLC will stop after this one.
+    // otherwise player will stop after this one.
     const nextInQueue = this.engine.peekQueue(1)[0]
     if (nextInQueue) {
-      await this.vlc.enqueue(nextInQueue.path)
+      await this.player.enqueue(nextInQueue.path)
       logger.info(`Pre-queued (manual play): ${nextInQueue.filename}`)
     } else {
       // If no more videos, try to enqueue off-air loop?
@@ -300,7 +299,7 @@ export class PlaybackService {
           appConfig.session.offAirAssetId
         )
         if (offAirMedia) {
-          await this.vlc.enqueue(offAirMedia.path)
+          await this.player.enqueue(offAirMedia.path)
           logger.info(
             `Pre-queued off-air (manual play): ${offAirMedia.filename}`
           )
@@ -309,8 +308,7 @@ export class PlaybackService {
     }
   }
 
-  // NOTE: "Last video badge" feature removed - VLC 3.0 doesn't support runtime logo control
-  // Revisit when VLC 4.0 is stable
+  // NOTE: "Last video badge" feature removed - runtime logo control not fully supported in simple overlay
 
   /**
    * Enter off-air mode - play the configured off-air asset on loop
@@ -321,14 +319,14 @@ export class PlaybackService {
 
     if (!offAirAssetId) {
       logger.info('No off-air asset configured, stopping playback')
-      await this.vlc.stop()
+      await this.player.stop()
       return
     }
 
     const mediaItem = await this.media.getById(offAirAssetId)
     if (!mediaItem) {
       logger.warn(`Off-air asset ID ${offAirAssetId} not found`)
-      await this.vlc.stop()
+      await this.player.stop()
       return
     }
 
@@ -337,8 +335,8 @@ export class PlaybackService {
     logger.info(`Entering off-air mode with: ${mediaItem.filename}`)
 
     // Play with loop enabled
-    await this.vlc.play(mediaItem.path)
-    await this.vlc.setLoop(true)
+    await this.player.play(mediaItem.path)
+    await this.player.setLoop(true)
 
     // Broadcast off-air state to frontend
     this.events?.broadcast({
@@ -359,17 +357,17 @@ export class PlaybackService {
   // --- Lifecycle ---
 
   /**
-   * Connect to VLC
+   * Connect to player
    */
   async connect(): Promise<void> {
-    await this.vlc.connect()
+    await this.player.connect()
   }
 
   /**
-   * Disconnect from VLC
+   * Disconnect from player
    */
   async disconnect(): Promise<void> {
-    await this.vlc.disconnect()
+    await this.player.disconnect()
   }
 
   /**
@@ -388,8 +386,8 @@ export class PlaybackService {
   }
 
   /**
-   * Main playback loop - monitors VLC and handles track transitions.
-   * This is a "Sync Loop" that detects when VLC auto-advances to the next
+   * Main playback loop - monitors player and handles track transitions.
+   * This is a "Sync Loop" that detects when player auto-advances to the next
    * queued video, then immediately enqueues the following video to maintain
    * a seamless playback buffer.
    */
@@ -400,7 +398,7 @@ export class PlaybackService {
     let lastIsPlaying = false
 
     while (this.running) {
-      // In off-air mode, just keep looping (VLC handles the loop)
+      // In off-air mode, just keep looping (player handles the loop)
       if (this.offAirMode) {
         await Bun.sleep(1000)
         continue
@@ -412,7 +410,7 @@ export class PlaybackService {
       }
 
       try {
-        const status = await this.vlc.getStatus()
+        const status = await this.player.getStatus()
         disconnectedLogged = false // Connection active
 
         // Detect Pause/Resume changes
@@ -432,18 +430,18 @@ export class PlaybackService {
 
         // Detect track transition by comparing positions.
         // A real transition = position went from "late" to "early" (position reset)
-        // OR: VLC position exceeds our expected duration (VLC auto-advanced)
+        // OR: Player position exceeds our expected duration (Player auto-advanced)
         const wasLateInVideo = lastPosition > lateThreshold
         const nowEarlyInVideo = status.positionSeconds < 3
         const positionReset =
           wasLateInVideo && nowEarlyInVideo && status.isPlaying
 
-        // Also detect when VLC jumps beyond our expected video (it moved to next)
-        const vlcBeyondExpected =
+        // Also detect when player jumps beyond our expected video (it moved to next)
+        const playerBeyondExpected =
           status.positionSeconds > expectedDuration + 5 && status.isPlaying
 
-        // Detect manual track change via VLC UI (filename mismatch)
-        const vlcFileMismatch =
+        // Detect manual track change via player UI (filename mismatch)
+        const fileMismatch =
           status.currentFile &&
           this.currentVideo &&
           status.isPlaying &&
@@ -453,40 +451,42 @@ export class PlaybackService {
 
         const wasPlaying = this.currentVideo !== null
 
-        // If VLC stopped entirely (not playing, nothing enqueued), session may be over
+        // If player stopped entirely (not playing, nothing enqueued), session may be over
         if (
           !status.isPlaying &&
           status.state !== 'paused' &&
           wasPlaying &&
           lastPosition > 3
         ) {
-          // Wait a moment to confirm VLC truly stopped (not just buffering between tracks)
+          // Wait a moment to confirm player truly stopped (not just buffering between tracks)
           await Bun.sleep(800)
-          const recheck = await this.vlc.getStatus()
+          const recheck = await this.player.getStatus()
           if (!recheck.isPlaying && recheck.state !== 'paused') {
-            // VLC has stopped - session complete
-            logger.info('VLC stopped, session complete, entering off-air mode')
+            // Player has stopped - session complete
+            logger.info(
+              'Player stopped, session complete, entering off-air mode'
+            )
             await this.enterOffAirMode()
             lastPosition = 0
             continue
           }
         }
 
-        // Transition detection: position reset OR VLC beyond expected OR file mismatch
+        // Transition detection: position reset OR player beyond expected OR file mismatch
         if (
-          (positionReset || vlcBeyondExpected || vlcFileMismatch) &&
+          (positionReset || playerBeyondExpected || fileMismatch) &&
           status.isPlaying
         ) {
           logger.debug(
             'Loop',
-            `Track transition detected (reset=${positionReset}, beyond=${vlcBeyondExpected}, mismatch=${vlcFileMismatch})`
+            `Track transition detected (reset=${positionReset}, beyond=${playerBeyondExpected}, mismatch=${fileMismatch})`
           )
 
           // Advance our internal state
           const next = await this.engine.getNextVideo()
 
           if (next) {
-            // Update internal state to match VLC
+            // Update internal state to match Player
             this.currentVideo = next
             lastPosition = status.positionSeconds // Reset position tracking
             disconnectedLogged = false
@@ -508,7 +508,7 @@ export class PlaybackService {
             // PRE-QUEUE: Immediately enqueue the following video
             const upcoming = this.engine.peekQueue(1)[0]
             if (upcoming) {
-              await this.vlc.enqueue(upcoming.path)
+              await this.player.enqueue(upcoming.path)
               logger.info(`Pre-queued: ${upcoming.filename}`)
             } else {
               // No more videos - enqueue off-air if available
@@ -518,7 +518,7 @@ export class PlaybackService {
                   appConfig.session.offAirAssetId
                 )
                 if (offAirMedia) {
-                  await this.vlc.enqueue(offAirMedia.path)
+                  await this.player.enqueue(offAirMedia.path)
                   logger.info(`Pre-queued off-air: ${offAirMedia.filename}`)
                 }
               }
@@ -534,15 +534,13 @@ export class PlaybackService {
         }
       } catch (error: any) {
         const msg = error?.message || String(error)
-        const isVlcError =
-          msg.includes('Not connected') ||
-          msg.includes('ECONNREFUSED') ||
-          error instanceof VlcConnectionError
+        const isPlayerError =
+          msg.includes('Not connected') || msg.includes('ECONNREFUSED')
 
-        if (isVlcError) {
+        if (isPlayerError) {
           if (!disconnectedLogged) {
             console.error(
-              `❌ VLC Connection Lost: ${msg}\n   -> Please restart VLC manually to resume playback.`
+              `❌ Player Connection Lost: ${msg}\n   -> Please restart MPV/Player manually to resume playback.`
             )
             disconnectedLogged = true
           }
