@@ -91,6 +91,10 @@ else
     useradd -r -s /bin/false -d $INSTALL_DIR $SERVICE_NAME
 fi
 
+# Ensure permissions for audio/video
+log "Granting audio/video permissions..."
+usermod -a -G audio,video,render $SERVICE_NAME 2>/dev/null || usermod -a -G audio,video $SERVICE_NAME
+
 # --- Install Application ---
 log "Downloading ToastTV $VERSION..."
 TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
@@ -166,8 +170,8 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT EXIT
 
-# Start VLC
-cvlc --extraintf rc --rc-host localhost:$VLC_PORT 2>/dev/null &
+# Start VLC (with logging to journal, headless safe)
+cvlc --no-x-lib --extraintf rc --rc-host localhost:$VLC_PORT &
 
 # Wait for VLC
 for i in {1..20}; do
