@@ -298,7 +298,13 @@ export class MpvClient implements IMediaPlayer {
     // 2. [logo] format=rgba, colorchannelmixer=aa=ALPHA [logo_alpha]
     // 3. [in][logo_alpha] overlay=x=...:y=... [out]
 
-    const filter = `movie='${safePath}'[logo];[logo]format=rgba,colorchannelmixer=aa=${alpha}[logo_alpha];[in][logo_alpha]overlay=x=${xExpr}:y=${yExpr}[out]`
+    // Filter Graph Construction
+    // 1. movie='path' [logo]
+    // 2. [logo][in] scale2ref=h=ih*0.15:w=-1 [logo_scaled][in_ref] (Scale logo to 15% of video height)
+    // 3. [logo_scaled] format=rgba,colorchannelmixer=aa=ALPHA [logo_ready]
+    // 4. [in_ref][logo_ready] overlay=x=...:y=... [out]
+
+    const filter = `movie='${safePath}'[logo];[logo][in]scale2ref=h=ih*0.15:w=-1[logo_scaled][in_ref];[logo_scaled]format=rgba,colorchannelmixer=aa=${alpha}[logo_ready];[in_ref][logo_ready]overlay=x=${xExpr}:y=${yExpr}[out]`
 
     console.log(`[MpvClient] Setting logo:`, { config, filter })
 

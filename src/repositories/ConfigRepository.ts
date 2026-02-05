@@ -195,7 +195,7 @@ export class ConfigRepository {
         enabled: s['logo.enabled'] === 'true',
         imagePath: s['logo.imagePath'] ?? null,
         opacity: parseInt(s['logo.opacity'] ?? '128', 10),
-        position: parseInt(s['logo.position'] ?? '2', 10),
+        position: parseInt(s['logo.position'] ?? '6', 10),
         x: parseInt(s['logo.x'] ?? '8', 10),
         y: parseInt(s['logo.y'] ?? '8', 10),
       },
