@@ -166,50 +166,22 @@ rm -rf "$TMP_DIR"
 
 log "Installed binary & starter content successfully"
 
-# --- Create Launcher Script (X11 Kiosk Mode) ---
-log "Creating X11 kiosk launcher..."
-cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
+# --- Create X11 Session Script (runs inside X) ---
+log "Creating X11 session script..."
+cat > $INSTALL_DIR/bin/toasttv-session << 'XSESSION'
 #!/bin/bash
-# ToastTV X11 Kiosk Launcher
-# Starts a minimal X server + VLC fullscreen
+# ToastTV X11 Session
+# This script runs INSIDE the X session started by xinit
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
-export DISPLAY=:0
-
-cleanup() {
-    pkill -P $$ cvlc 2>/dev/null || true
-    pkill -P $$ Xorg 2>/dev/null || true
-    exit 0
-}
-trap cleanup SIGTERM SIGINT EXIT
-
-# Start minimal X server
-# -nolisten tcp: Security (no remote X)
-# vt1: Use virtual terminal 1 (console)
-# -nocursor: Hide mouse cursor
-Xorg :0 -nolisten tcp -nocursor vt1 &
-XPID=$!
-
-# Wait for X to be ready
-for i in {1..30}; do
-    if xdpyinfo -display :0 >/dev/null 2>&1; then
-        break
-    fi
-    sleep 0.5
-done
-
-if ! xdpyinfo -display :0 >/dev/null 2>&1; then
-    echo "ERROR: X server failed to start"
-    exit 1
-fi
 
 # Disable screen blanking / power saving
-xset -display :0 -dpms
-xset -display :0 s off
-xset -display :0 s noblank
+xset -dpms
+xset s off
+xset s noblank
 
-# Start VLC fullscreen with RC interface for remote control
+# Start VLC fullscreen with RC interface
 cvlc --fullscreen --no-osd --extraintf rc --rc-host localhost:$VLC_PORT &
 VLC_PID=$!
 
@@ -226,10 +198,30 @@ if ! nc -z localhost $VLC_PORT 2>/dev/null; then
     exit 1
 fi
 
-echo "X11 + VLC ready on DISPLAY=:0"
+echo "VLC ready on port $VLC_PORT"
 
-# Start ToastTV app
-exec $INSTALL_DIR/bin/toasttv
+# Start ToastTV app (this blocks until exit)
+$INSTALL_DIR/bin/toasttv
+
+# Cleanup VLC when app exits
+kill $VLC_PID 2>/dev/null
+XSESSION
+
+chmod +x $INSTALL_DIR/bin/toasttv-session
+
+# --- Create Launcher Script (uses xinit) ---
+log "Creating X11 kiosk launcher..."
+cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
+#!/bin/bash
+# ToastTV X11 Kiosk Launcher
+# Uses xinit to properly manage X server lifecycle
+
+INSTALL_DIR="/opt/toasttv"
+
+# xinit runs the session script inside a new X server
+# -- :0 vt1: X server on display :0, virtual terminal 1
+# -nocursor: Hide mouse cursor
+exec xinit $INSTALL_DIR/bin/toasttv-session -- :0 vt1 -nocursor -nolisten tcp
 LAUNCHER
 
 chmod +x $INSTALL_DIR/bin/start-toasttv
