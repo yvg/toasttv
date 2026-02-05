@@ -57,14 +57,7 @@ The mascots **Penny & Chip** are ready to run your station.
 
 ## Tech Stack
 
-Built with simplicity and performance in mind:
-
-- **Runtime**: [Bun](https://bun.sh) (Fast all-in-one JavaScript runtime)
-- **Server**: [Hono](https://hono.dev) (Lightweight web framework)
-- **Database**: [SQLite](https://sqlite.org) (Zero-dependency, embedded)
-- **Player**: [VLC](https://www.videolan.org) (Native hardware decoding via RC interface)
-
-For a deep dive into the code structure and design decisions, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+Built with simplicity and performance in mind, ror a deep dive into tech stack, code structure and design decisions, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Development
 
