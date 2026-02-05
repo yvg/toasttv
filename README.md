@@ -11,7 +11,7 @@ The anti-algorithm for tired parents and kids who just want to watch cartoons.
 ## Install (Raspberry Pi)
 
 ```bash
-TODO
+curl -fsSL https://raw.githubusercontent.com/yvg/toasttv/main/scripts/install.sh | sudo bash
 ```
 
 ## Getting Started
@@ -25,10 +25,15 @@ Once installed, your station needs content:
 
 The dashboard puts you in the director's chair:
 
-| **Library Management** | **Bedtime Enforcement** |
-|:---:|:---:|
-| Upload videos, categorize content, and toggle interludes instantly. | One tap to "Sign Off" manually, or set automatic daily limits. |
-| <a href="docs/library.png"><img src="docs/library.png" height="50%"></a> | <a href="docs/off_air.png"><img src="docs/off_air.png" height="50%"></a> |
+### Library Management
+Upload videos, categorize content, and toggle interludes instantly.
+
+<img src="docs/library.png" alt="Library Management" width="100%">
+
+### Bedtime Enforcement
+One tap to "Sign Off" manually, or set automatic daily limits.
+
+<img src="docs/off_air.png" alt="Bedtime Enforcement" width="100%">
 
 ## Why It's Better Than a Playlist
 

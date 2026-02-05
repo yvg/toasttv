@@ -58,51 +58,30 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 ARCH=$(uname -m)
-if [[ "$ARCH" != "aarch64" && "$ARCH" != "x86_64" && "$ARCH" != "armv7l" ]]; then
+if [[ "$ARCH" != "aarch64" ]]; then
     error "Unsupported architecture: $ARCH"
-    error "ToastTV requires ARM64, ARMv7, or x86_64"
+    error "ToastTV binary REQUIRES a 64-bit ARM OS (linux-aarch64)."
+    error "For other architectures, please install from source."
     exit 1
 fi
 
-if ! command -v apt-get &>/dev/null; then
-    error "This installer requires apt-get (Debian/Ubuntu/Raspberry Pi OS)"
-    exit 1
-fi
+# ... [Log Header] ...
 
-echo ""
-echo "🍞 ToastTV Installer"
-echo "===================="
-echo ""
-
-# --- Determine Version ---
+# --- Determin Version ---
 if [[ -z "$VERSION" ]]; then
     log "Fetching latest release..."
     VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 || echo "")
 fi
 
 if [[ -z "$VERSION" ]]; then
-    warn "No releases found, using main branch"
-    USE_GIT=true
-else
-    log "Installing version: $VERSION"
-    USE_GIT=false
+    error "Could not determine latest version. Please check internet connection."
+    exit 1
 fi
 
 # --- Install System Dependencies ---
-log "Installing system dependencies..."
+log "Installing dependencies (VLC, FFmpeg)..."
 apt-get update -qq
 apt-get install -y -qq vlc ffmpeg curl
-
-# --- Install Bun Runtime ---
-if command -v bun &>/dev/null; then
-    log "Bun already installed: $(bun --version)"
-else
-    log "Installing Bun runtime..."
-    export BUN_INSTALL="/root/.bun"
-    curl -fsSL https://bun.sh/install | bash
-    ln -sf /root/.bun/bin/bun /usr/local/bin/bun
-    log "Bun installed: $(/usr/local/bin/bun --version)"
-fi
 
 # --- Create System User ---
 if id -u $SERVICE_NAME &>/dev/null; then
@@ -112,128 +91,59 @@ else
     useradd -r -s /bin/false -d $INSTALL_DIR $SERVICE_NAME
 fi
 
-# --- Create Directory Structure ---
-log "Setting up directories..."
-mkdir -p $INSTALL_DIR/{app,data,media/videos,media/interludes,bin}
+# --- Install Application ---
+log "Downloading ToastTV $VERSION..."
+TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
 
-# --- Download Application ---
-if [[ "$USE_GIT" == "true" ]]; then
-    # Fallback: Clone from git
-    log "Downloading from git (main branch)..."
-    apt-get install -y -qq git
-    
-    if [[ -d "$INSTALL_DIR/app/.git" ]]; then
-        git -C $INSTALL_DIR/app fetch --depth 1
-        git -C $INSTALL_DIR/app reset --hard origin/main
-    else
-        rm -rf $INSTALL_DIR/app
-        git clone --depth 1 ${REPO_URL}.git $INSTALL_DIR/app
-    fi
-    
-    log "Installing dependencies..."
-    cd $INSTALL_DIR/app
-    /usr/local/bin/bun install --production
-else
-    # Preferred: Download release tarball
-    log "Downloading release tarball..."
-    TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
-    
-    TMP_DIR=$(mktemp -d)
-    curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/toasttv.tar.gz"
-    
-    # Extract (tarball contains toasttv/ directory)
-    rm -rf $INSTALL_DIR/app
-    mkdir -p $INSTALL_DIR/app
-    tar -xzf "$TMP_DIR/toasttv.tar.gz" -C $INSTALL_DIR/app --strip-components=1
-    
-    rm -rf "$TMP_DIR"
-    log "Downloaded and extracted successfully"
-fi
+TMP_DIR=$(mktemp -d)
+curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/toasttv.tar.gz"
+
+# Cleanup old app
+rm -rf $INSTALL_DIR/app
+mkdir -p $INSTALL_DIR/bin
+mkdir -p $INSTALL_DIR/{data,media/videos,media/interludes}
+
+# Extract
+tar -xzf "$TMP_DIR/toasttv.tar.gz" -C $INSTALL_DIR
+mv $INSTALL_DIR/toasttv/toasttv $INSTALL_DIR/bin/toasttv
+mv $INSTALL_DIR/toasttv/public $INSTALL_DIR/public
+rm -rf $INSTALL_DIR/toasttv
+
+rm -rf "$TMP_DIR"
+chmod +x $INSTALL_DIR/bin/toasttv
+log "Installed binary successfully"
 
 # --- Create Launcher Script ---
-log "Creating launcher script..."
-cat > $INSTALL_DIR/bin/toasttv << 'LAUNCHER'
+log "Creating launcher wrapper..."
+cat > $INSTALL_DIR/bin/start-toasttv << 'LAUNCHER'
 #!/bin/bash
-#
-# ToastTV Launcher - Manages VLC + Application
-#
+# ToastTV Wrapper
 
 INSTALL_DIR="/opt/toasttv"
 VLC_PORT=9999
 
 cleanup() {
-    echo "ToastTV shutting down..."
     pkill -P $$ cvlc 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGTERM SIGINT EXIT
 
-# Start VLC in headless mode with RC interface and logo filter
-echo "Starting VLC..."
+# Start VLC
+cvlc --extraintf rc --rc-host localhost:$VLC_PORT 2>/dev/null &
 
-# Create logo args helper script
-mkdir -p $INSTALL_DIR/scripts
-cat > $INSTALL_DIR/scripts/vlc-logo-args.ts << 'EOF'
-import { Database } from 'bun:sqlite'
-import { existsSync } from 'fs'
-
-const dbPath = process.argv[2] || './data/media.db'
-
-if (!existsSync(dbPath)) process.exit(0)
-
-try {
-  const db = new Database(dbPath, { readonly: true })
-  const get = (k: string) => {
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | null
-    return row?.value
-  }
-
-  const enabled = get('logo.enabled') !== 'false'
-  const path = get('logo.imagePath')
-
-  if (enabled && path && existsSync(path)) {
-    const opacity = get('logo.opacity') || '128'
-    const rawPos = parseInt(get('logo.position') || '2', 10)
-    const x = parseInt(get('logo.x') || '8', 10)
-    const y = parseInt(get('logo.y') || '8', 10)
-    
-    // ToastTV Position Enum -> VLC Logo Position ID
-    const map: Record<number, number> = {
-      0: 5, 1: 4, 2: 6,
-      3: 1, 4: 0, 5: 2,
-      6: 9, 7: 8, 8: 10
-    }
-    const vlcPos = map[rawPos] ?? 6
-    console.log(\`--sub-source=logo --logo-file=\${path} --logo-position=\${vlcPos} --logo-opacity=\${opacity} --logo-x=\${x} --logo-y=\${y}\`)
-  }
-} catch (e) {}
-EOF
-
-LOGO_ARGS=$(/usr/local/bin/bun $INSTALL_DIR/scripts/vlc-logo-args.ts "$INSTALL_DIR/data/media.db")
-
-cvlc --extraintf rc --rc-host localhost:$VLC_PORT $LOGO_ARGS 2>/dev/null &
-VLC_PID=$!
-
-# Wait for VLC to be ready
-echo "Waiting for VLC..."
+# Wait for VLC
 for i in {1..20}; do
     if nc -z localhost $VLC_PORT 2>/dev/null; then
-        echo "VLC ready on port $VLC_PORT"
         break
     fi
     sleep 0.5
 done
 
-if ! nc -z localhost $VLC_PORT 2>/dev/null; then
-    echo "ERROR: VLC failed to start on port $VLC_PORT"
-    exit 1
-fi
-
-# Start the application
-echo "Starting ToastTV application..."
-cd "$INSTALL_DIR/app"
-exec /usr/local/bin/bun run src/main.ts
+# Start App
+exec $INSTALL_DIR/bin/toasttv
 LAUNCHER
+
+chmod +x $INSTALL_DIR/bin/start-toasttv
 
 chmod +x $INSTALL_DIR/bin/toasttv
 
@@ -249,8 +159,8 @@ After=network.target
 Type=simple
 User=$SERVICE_NAME
 Group=$SERVICE_NAME
-WorkingDirectory=$INSTALL_DIR/app
-ExecStart=$INSTALL_DIR/bin/toasttv
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/bin/start-toasttv
 Restart=on-failure
 RestartSec=5
 
