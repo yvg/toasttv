@@ -186,7 +186,10 @@ TMP_DIR=$(mktemp -d)
 
 info "Downloading tarball..."
 echo "  $TARBALL_URL"
-curl -fL# "$TARBALL_URL" -o "$TMP_DIR/toasttv.tar.gz"
+curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/toasttv.tar.gz"
+echo "DEBUG: File downloaded to $TMP_DIR/toasttv.tar.gz"
+ls -lh "$TMP_DIR/toasttv.tar.gz"
+file "$TMP_DIR/toasttv.tar.gz" || true
 log "Download complete"
 
 # --- Install Application ---
