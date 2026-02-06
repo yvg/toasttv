@@ -122,7 +122,7 @@ step "Installing system dependencies"
 info "Checking system dependencies..."
 # apt-get update -qq  <-- Removed eager update
 
-PACKAGES="mpv ffmpeg"
+PACKAGES="mpv ffmpeg cec-utils"
 for pkg in $PACKAGES; do
     printf "    %-12s" "$pkg"
     if dpkg -s "$pkg" >/dev/null 2>&1; then

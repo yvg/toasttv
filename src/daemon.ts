@@ -19,7 +19,8 @@ import {
 } from './services/PlaylistEngine'
 import { SessionManager } from './services/SessionManager'
 import { ConfigService } from './services/ConfigService'
-import { type MediaItem, type ToastTVConfig, type IMediaPlayer } from './types'
+import { PlaybackService } from './services/PlaybackService'
+import type { MediaItem, ToastTVConfig, IMediaPlayer } from './types'
 
 export class ToastTVDaemon {
   private running = false
@@ -29,6 +30,8 @@ export class ToastTVDaemon {
   private player: IMediaPlayer | null = null
   private indexer: MediaIndexer | null = null
   private engine: PlaylistEngine | null = null
+  private playbackService: PlaybackService | null = null
+  private configService: ConfigService | null = null
 
   constructor(configPath = './data/config.json') {
     this.appConfig = new ConfigRepository(configPath)
@@ -80,6 +83,16 @@ export class ToastTVDaemon {
 
   getConfigManager(): ConfigRepository {
     return this.appConfig
+  }
+
+  getPlaybackService(): PlaybackService {
+    if (!this.playbackService) throw new Error('Daemon not started')
+    return this.playbackService
+  }
+
+  getConfigService(): ConfigService {
+    if (!this.configService) throw new Error('Daemon not started')
+    return this.configService
   }
 
   /**
@@ -146,7 +159,7 @@ export class ToastTVDaemon {
    * Call this AFTER starting the web server to ensure fast UI availability.
    */
   async start(): Promise<void> {
-    if (!this.player || !this.indexer || !this.repository) {
+    if (!this.player || !this.indexer || !this.repository || !this.engine) {
       throw new Error('Daemon not initialized. Call init() first.')
     }
 
@@ -155,12 +168,21 @@ export class ToastTVDaemon {
     // 4. Run Scan & Connect
     await this.indexer.scanAll()
 
-    // 5. Auto-discover special media (intro/outro/offair) via ConfigService
-    const configService = new ConfigService(this.appConfig)
+    // 5. Create ConfigService and auto-discover special media
+    this.configService = new ConfigService(this.appConfig)
     const allMedia = await this.repository.getAll()
-    await configService.discoverSpecialMedia(allMedia)
+    await this.configService.discoverSpecialMedia(allMedia)
 
     await this.player.connect()
+
+    // 6. Create PlaybackService (needed for CEC and server)
+    this.playbackService = new PlaybackService({
+      player: this.player,
+      engine: this.engine,
+      config: this.configService,
+      media: this.repository,
+      // Note: No DashboardEventService here - server can set it later if needed
+    })
 
     // Get fresh config for logo settings
     const runtimeConfig = await this.appConfig.get()
@@ -189,41 +211,53 @@ export class ToastTVDaemon {
   }
 
   private async initializeCEC(): Promise<void> {
-    if (!this.player || !this.engine) return
+    if (!this.playbackService) return
     const cec = new CECClient()
-    const engine = this.engine
-    const player = this.player
+    const playback = this.playbackService
 
-    // Map remote buttons to actions
+    // Map remote buttons to actions via PlaybackService
     cec.onPowerOn(() => {
       console.log('CEC: TV turned on, starting session')
-      void engine.startSession()
+      void playback.startSession()
     })
 
     cec.onKeyPress(CEC_KEYS.PLAY, () => {
-      void engine.startSession()
+      console.log('CEC: PLAY - starting session')
+      void playback.startSession()
     })
 
     cec.onKeyPress(CEC_KEYS.PAUSE, () => {
-      void player.pause()
+      console.log('CEC: PAUSE - toggling pause')
+      void playback.pause()
     })
 
     cec.onKeyPress(CEC_KEYS.STOP, () => {
-      void engine.endSession()
+      console.log('CEC: STOP - ending session')
+      void playback.endSession()
     })
 
     cec.onKeyPress(CEC_KEYS.FORWARD, () => {
-      void engine.getNextVideo() // Skip handled by playback loop
+      console.log('CEC: FORWARD - skipping to next video')
+      void playback.skip()
+    })
+
+    cec.onKeyPress(CEC_KEYS.RIGHT, () => {
+      console.log('CEC: RIGHT - skipping to next video')
+      void playback.skip()
     })
 
     cec.onKeyPress(CEC_KEYS.SELECT, () => {
       // Toggle play/pause
-      if (engine.isSessionActive) {
-        void player.pause()
+      if (playback.isSessionActive) {
+        console.log('CEC: SELECT - toggling pause')
+        void playback.pause()
       } else {
-        void engine.startSession()
+        console.log('CEC: SELECT - starting session')
+        void playback.startSession()
       }
     })
+
+    // TODO: Add power off detection to end session
 
     await cec.start()
     console.log('CEC listener started')

@@ -29,7 +29,7 @@ export class PlaybackService {
   private readonly engine: PlaylistEngine
   private readonly config: ConfigService
   private readonly media: IMediaRepository
-  private readonly events?: DashboardEventService
+  private events?: DashboardEventService
 
   constructor(deps: PlaybackServiceDeps) {
     this.player = deps.player
@@ -37,6 +37,14 @@ export class PlaybackService {
     this.config = deps.config
     this.media = deps.media
     this.events = deps.events
+  }
+
+  /**
+   * Set the event service for SSE dashboard updates.
+   * Called by server after daemon creates the base service.
+   */
+  setEventService(events: DashboardEventService): void {
+    this.events = events
   }
 
   // --- Session Info ---

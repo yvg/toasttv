@@ -41,7 +41,20 @@ One tap to "Sign Off" manually, or set automatic daily limits.
 - **Screen Time Limits**: Set a daily quota (e.g. 45 mins). When time is up, the station plays the sign-off sequence and stops. No arguments.
 - **Seasonal Awareness**: Christmas interludes in December, Spooky bumpers in October. The engine tracks dates automatically—zero config required.
 - **Native MPV Power**: Plays MKV, AVI, MP4 directly with hardware acceleration (DRM/KMS). No transcoding, no buffering, rock-solid sync.
-- **Living Room Ready**: Put the keyboard away. Use your **actual TV remote** (Play/Pause/Skip) via HDMI-CEC.
+- **Living Room Ready**: No keyboard needed. Control playback with your **TV remote** via HDMI-CEC.
+
+### TV Remote Control (HDMI-CEC)
+
+ToastTV listens for HDMI-CEC commands from your TV remote:
+
+| Button | Action |
+|--------|--------|
+| **SELECT / OK** | Start playback or toggle pause |
+| **RIGHT →** | Skip to next video |
+| **PLAY** | Start playback |
+| **PAUSE** | Pause video |
+
+> **Note**: CEC support varies by TV. Arrow keys and SELECT typically work best.
 
 ### Starter Content
 
@@ -82,7 +95,7 @@ Test the install flow locally using a Raspberry Pi VM (or any ARM64 VM):
 make serve-local
 
 # In the VM: curl install from your computer
-curl -fsSL http://<computer-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<computer-ip>:3000 VERSION=dev bash
+curl -fsSL http://<computer-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<computer-ip>:3000 bash
 ```
 
 This builds a fresh tarball and serves it via a local HTTP server that mocks GitHub release endpoints.

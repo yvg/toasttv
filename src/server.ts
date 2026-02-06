@@ -9,9 +9,8 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import type { ToastTVDaemon } from './daemon'
 import { renderDashboard } from './templates/dashboard'
-import { ConfigService } from './services/ConfigService'
 import { MediaService } from './services/MediaService'
-import { PlaybackService } from './services/PlaybackService'
+import type { PlaybackService } from './services/PlaybackService'
 import { DashboardEventService } from './services/DashboardEventService'
 import { ThumbnailClient } from './clients/ThumbnailClient'
 import { createPlaybackController } from './controllers/PlaybackController'
@@ -28,10 +27,14 @@ export interface ServerResult {
 export function createServer(daemon: ToastTVDaemon): ServerResult {
   const app = new Hono()
 
-  // --- Create Services ---
-  const configService = new ConfigService(daemon.getConfigManager())
+  // --- Get Services from Daemon ---
+  const configService = daemon.getConfigService()
+  const playbackService = daemon.getPlaybackService()
   const thumbnailClient = new ThumbnailClient()
   const dashboardEventService = new DashboardEventService()
+
+  // Inject event service for SSE dashboard updates
+  playbackService.setEventService(dashboardEventService)
 
   const mediaService = new MediaService(
     daemon.getRepository(),
@@ -39,14 +42,6 @@ export function createServer(daemon: ToastTVDaemon): ServerResult {
     configService,
     thumbnailClient
   )
-
-  const playbackService = new PlaybackService({
-    player: daemon.getPlayer(),
-    engine: daemon.getEngine(),
-    config: configService,
-    media: daemon.getRepository(),
-    events: dashboardEventService,
-  })
 
   // --- Mount Static Files ---
   app.use('/*', serveStatic({ root: './public' }))
