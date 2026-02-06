@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ToastTV - Raspberry Pi Retro Cartoon Station for Kids</title>
+  <meta name="description" content="Turn your Raspberry Pi into a retro TV station for your kids. No ads, no tracking, no choice paralysis.">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  
+  <!-- Open Graph / Mastodon / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://yvg.github.io/toasttv/">
+  <meta property="og:title" content="ToastTV - The Anti-Algorithm for Tired Parents">
+  <meta property="og:description" content="Turn your Raspberry Pi into a retro TV station for your kids. No ads, no tracking, no choice paralysis.">
+  <meta property="og:image" content="https://yvg.github.io/toasttv/assets/mascots.png">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://yvg.github.io/toasttv/assets/mascots.png">
+
+  <!-- JSON-LD Semantic Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "ToastTV",
+      "operatingSystem": "Raspberry Pi OS, Linux",
+      "applicationCategory": "Multimedia",
+      "description": "Turn your Raspberry Pi into a retro TV station for your kids. No ads, no tracking, no choice paralysis.",
+      "author": {
+        "@type": "Person",
+        "name": "Yves Van Goethem",
+        "url": "https://yves.vg"
+      }
+    }
+  </script>
+  
+  <style>
+    /* --- Inlined Critical CSS (Performance) --- */
+    :root {
+      /* 90s Cartoon TV Palette */
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-card: #0f3460;
+      --text-primary: #ffffff;
+      --text-secondary: #b8c5d6;
+      /* Vibrant 90s Colors */
+      --toast-orange: #ff6b35;
+      --toast-green: #00d26a;
+      --toast-pink: #ff3366;
+      --toast-yellow: #ffd93d;
+    }
+
+    /* Reset & Base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+    /* Custom Landing Page Styles */
+    body {
+      background: var(--bg-primary);
+      overflow-x: hidden;
+      color: var(--text-primary);
+    }
+
+    .hero-section {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      padding: 4rem 2rem;
+      background: radial-gradient(circle at center, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .hero-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-content {
+      z-index: 10;
+      max-width: 900px;
+      position: relative;
+    }
+
+    /* Sticker effect for Penny to hide white background boxiness */
+    .mascot-container {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 2rem;
+      background: #fff;
+      border: 4px solid #000;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
+      animation: bounce 2s infinite ease-in-out;
+      overflow: hidden;
+    }
+
+    .mascot-icon {
+      width: 90%;
+      height: 90%;
+      object-fit: contain;
+    }
+
+    h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      margin-bottom: 1.5rem;
+      color: #fff;
+      -webkit-text-stroke: 2px #000;
+      text-shadow: 4px 4px 0px var(--toast-orange);
+      line-height: 1.1;
+    }
+
+    h1 span {
+      color: var(--toast-yellow);
+      text-shadow: 4px 4px 0px var(--toast-pink);
+    }
+
+    p.lead {
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      margin-bottom: 3rem;
+      background: rgba(0,0,0,0.6);
+      display: inline-block;
+      padding: 1rem;
+      border-radius: 12px;
+      border: 2px solid #000;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    }
+
+    .install-block {
+      background: #000;
+      border: 3px solid var(--text-secondary);
+      padding: 3rem 2rem 1.5rem;
+      border-radius: 12px;
+      font-family: 'Fira Code', monospace;
+      color: var(--toast-green);
+      margin: 0 auto 1rem;
+      max-width: 100%;
+      font-size: 1.1rem;
+      position: relative;
+      box-shadow: 6px 6px 0 rgba(255,255,255,0.2);
+      cursor: pointer;
+      display: inline-block;
+      transition: transform 0.1s;
+      overflow: hidden;
+    }
+
+    .install-block::before {
+      content: "root@raspberrypi:~";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2rem;
+      background: var(--text-secondary);
+      color: #000;
+      font-size: 0.8rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      padding-left: 1rem;
+      border-bottom: 3px solid var(--text-secondary);
+    }
+
+    .install-block:active {
+      transform: translate(2px, 2px);
+      box-shadow: 4px 4px 0 rgba(255,255,255,0.2);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 3rem;
+      margin: 4rem 0;
+      padding: 0 2rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 3px solid #000;
+      padding: 2rem;
+      border-radius: 16px;
+      text-align: left;
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: var(--toast-yellow);
+      text-shadow: 2px 2px 0 #000;
+    }
+
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+      filter: drop-shadow(3px 3px 0 rgba(0,0,0,0.5));
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .tv-showcase {
+      margin: -4rem auto 4rem;
+      position: relative;
+      max-width: 800px;
+      z-index: 5;
+    }
+
+    .tv-img {
+      width: 100%;
+      height: auto;
+      border-radius: 20px;
+      box-shadow: 0 0 60px rgba(255, 107, 53, 0.2);
+      border: 6px solid #000;
+    }
+
+    footer {
+      text-align: center;
+      padding: 4rem;
+      background: #000;
+      color: var(--text-secondary);
+      border-top: 4px solid var(--toast-orange);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-15px) rotate(3deg); }
+    }
+
+    /* Mobile Tweaks */
+    @media(max-width: 768px) {
+      h1 { font-size: 2.2rem; }
+      .install-block { font-size: 0.8rem; padding: 1rem; word-break: break-all; }
+      .hero-section { padding-top: 6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero-bg"></div>
+
+  <!-- Navbar Removed -->
+  
+  <!-- GitHub Corner -->
+  <a href="https://github.com/yvg/toasttv" target="_blank" class="github-corner" aria-label="View source on GitHub" style="position: absolute; top: 2rem; right: 2rem; z-index: 100; transition: transform 0.2s;">
+    <svg width="40" height="40" viewBox="0 0 24 24" style="fill:#fff; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5)); opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8" aria-hidden="true">
+      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path>
+    </svg>
+  </a>
+
+  <!-- Hero -->
+  <!-- ... existing hero content ... -->
+  <header class="hero-section">
+    <div class="hero-content">
+      <h1 class="brand-title" style="font-size: 4rem; margin-bottom: 2rem; color: white; text-shadow: 4px 4px 0 #000; -webkit-text-stroke: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 900; letter-spacing: -1px;">ToastTV</h1>
+      
+      <div class="mascot-container" style="width: 200px; height: auto; border: none; background: transparent; box-shadow: none; overflow: visible;">
+        <img src="assets/mascots.png" class="mascot-icon" alt="Penny and Chip" style="width: 100%; height: auto; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+      </div>
+      
+      <h2 style="font-size: 2.5rem; text-transform: uppercase; margin-bottom: 1.5rem; color: #fff; text-shadow: 3px 3px 0 #000;">THE WARM, CRISPY <br> <span style="color: var(--toast-yellow); text-shadow: 3px 3px 0 var(--toast-pink);">90s TV EXPERIENCE</span></h2>
+      
+      <p class="lead">
+        Turn your <strong style="color: var(--toast-pink); text-shadow: 2px 2px 0 #000;">Raspberry Pi</strong> into a cartoon channel.<br>
+        No ads. No scrolling. Just press play.
+      </p>
+
+      <div class="install-block" onclick="navigator.clipboard.writeText(this.innerText.replace('root@raspberrypi:~# ', '').trim()); alert('Copied!')" title="Click to Copy">
+        <!-- Install via GitHub -->
+        curl -fsSL https://raw.githubusercontent.com/yvg/toasttv/main/scripts/install.sh | sudo bash
+      </div>
+
+    </div>
+  </header>
+  <br>
+  <div class="container">
+    <div class="tv-showcase">
+      <img src="assets/hero.png" alt="90s Living Room with ToastTV" class="tv-img">
+    </div>
+
+    <!-- ... features ... -->
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">🚫</span>
+        <h3>Choice Paralysis Cured</h3>
+        <p>Your kids don't need 5,000 options. They need one good channel. ToastTV plays your curated folder of videos in a random loop.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">⏰</span>
+        <h3>Screen Time Enforced</h3>
+        <p>Set a daily limit (e.g., 45 mins). When time is up, Penny & Chip appear to say goodbye. No arguing with a screen.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">📺</span>
+        <h3>Real Remote Control</h3>
+        <p>Uses HDMI-CEC. Pause, play, and skip using your actual TV remote. Feels like real TV, not a computer interface.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">📅</span>
+        <h3>Seasonal Magic</h3>
+        <p>The engine tracks dates automatically. Christmas interludes in December, Spooky bumpers in October. Zero config required.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">🎛️</span>
+        <h3>Parent Dashboard</h3>
+        <p>Manage your library from your phone. Upload videos, toggle shows, and trigger manual "Sign Offs" instantly.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">🚀</span>
+        <h3>Native Performance</h3>
+        <p>Powered by MPV with hardware acceleration. Plays MKV, AVI, MP4 directly. No transcoding, no buffering.</p>
+      </div>
+
+
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      Built for curious kids and tired parents.<br>
+      <br>
+      by <a href="https://yves.vg">yvg</a>
+    </p>
+  </footer>
+
+</body>
+</html>
