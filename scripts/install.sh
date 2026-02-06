@@ -22,6 +22,19 @@ CURRENT_STEP=0
 REPO_URL="${LOCAL_SERVER:-https://github.com/${REPO_OWNER}/${REPO_NAME}}"
 API_URL="${LOCAL_SERVER:-https://api.github.com}"
 
+# Auto-detect latest version if not specified
+if [ -z "$VERSION" ]; then
+    # Use grep/sed to extract tag_name from JSON response
+    LATEST_TAG=$(curl -s "${API_URL}/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" | grep '"tag_name":' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+    
+    if [ -n "$LATEST_TAG" ]; then
+        VERSION="$LATEST_TAG"
+    else
+        # Fallback to dev if detection fails (or if we are on a private repo without a token)
+        VERSION="dev"
+    fi
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
