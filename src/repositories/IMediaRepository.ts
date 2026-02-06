@@ -37,6 +37,11 @@ export interface IMediaRepository {
   getById(id: number): Promise<MediaItem | null>
 
   /**
+   * Get a single media item by path
+   */
+  getByPath(path: string): Promise<MediaItem | null>
+
+  /**
    * Get all videos (mediaType === 'video')
    */
   getAllVideos(): Promise<MediaItem[]>

@@ -82,8 +82,12 @@ export class ToastTVDaemon {
     return this.appConfig
   }
 
-  async start(): Promise<void> {
-    console.log('ToastTV daemon starting...')
+  /**
+   * Initialize components (DB, Services). Fast.
+   * Call this before starting the web server.
+   */
+  async init(): Promise<void> {
+    console.log('ToastTV daemon initializing...')
 
     // 1. Initialize DB from bootstrap config
     const bootstrap = this.appConfig.getBootstrap()
@@ -134,6 +138,20 @@ export class ToastTVDaemon {
       new SystemDateTimeProvider()
     )
 
+    console.log('Components initialized.')
+  }
+
+  /**
+   * Start background tasks (Scanning, MPV Connection). Slow.
+   * Call this AFTER starting the web server to ensure fast UI availability.
+   */
+  async start(): Promise<void> {
+    if (!this.player || !this.indexer || !this.repository) {
+      throw new Error('Daemon not initialized. Call init() first.')
+    }
+
+    console.log('ToastTV background services starting...')
+
     // 4. Run Scan & Connect
     await this.indexer.scanAll()
 
@@ -143,6 +161,9 @@ export class ToastTVDaemon {
     await configService.discoverSpecialMedia(allMedia)
 
     await this.player.connect()
+
+    // Get fresh config for logo settings
+    const runtimeConfig = await this.appConfig.get()
 
     // Apply logo settings
     if (runtimeConfig.logo) {
@@ -164,7 +185,7 @@ export class ToastTVDaemon {
     }
 
     this.running = true
-    console.log('ToastTV daemon ready')
+    console.log('ToastTV daemon fully operational')
   }
 
   private async initializeCEC(): Promise<void> {

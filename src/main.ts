@@ -28,21 +28,27 @@ async function main(): Promise<void> {
   })
 
   try {
-    // Initialize daemon (but don't auto-start session)
-    await daemon.start()
+    // 1. Initialize daemon components (Sync/Fast)
+    await daemon.init()
 
-    // Create and start web server
+    // 2. Create and start web server (Immediate user response)
     const { app, playbackService } = createServer(daemon)
 
     console.log(`🌐 Admin UI: http://localhost:${PORT}`)
 
+    // 3. Start listening BEFORE waiting for MPV/Scanning
     Bun.serve({
       port: PORT,
       fetch: app.fetch,
       idleTimeout: 0, // Disable timeout for SSE connections
     })
 
-    // Run playback loop in background (owned by PlaybackService)
+    // 4. Run background services (Scanning, MPV connection)
+    // Don't await this blocking if you want the server to be responsive immediately
+    console.log('Starting background services...')
+    await daemon.start()
+
+    // 5. Run playback loop in background
     playbackService.startLoop()
   } catch (error) {
     console.error('Fatal error:', error)

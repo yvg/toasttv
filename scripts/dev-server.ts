@@ -36,6 +36,7 @@ const PROJECT_ROOT = join(import.meta.dir, '..')
 
 void Bun.serve({
   port: PORT,
+  idleTimeout: 0, // Disable timeout for slow downloads
   async fetch(req) {
     const url = new URL(req.url)
     const path = url.pathname
@@ -47,15 +48,24 @@ void Bun.serve({
       return Response.json({ tag_name: 'dev' })
     }
 
-    // Tarball download
-    if (path.match(/\/releases\/download\/.*\/toasttv-.*\.tar\.gz/)) {
-      const tarball = file(join(PROJECT_ROOT, 'dist/toasttv-dev.tar.gz'))
+    // Tarball download (App or Media)
+    const mediaMatch = path.match(/\/releases\/download\/.*\/media\.tar\.gz/)
+    const appMatch = path.match(/\/releases\/download\/.*\/toasttv-.*\.tar\.gz/)
+
+    if (appMatch || mediaMatch) {
+      const filename = mediaMatch ? 'media.tar.gz' : 'toasttv-dev.tar.gz'
+      const tarball = file(join(PROJECT_ROOT, `dist/${filename}`))
+
       if (await tarball.exists()) {
+        console.log(`[dev-server] Serving ${filename} (${tarball.size} bytes)`)
         return new Response(tarball, {
-          headers: { 'Content-Type': 'application/gzip' },
+          headers: {
+            'Content-Type': 'application/gzip',
+            'Content-Length': tarball.size.toString(),
+          },
         })
       }
-      return new Response("Tarball not found. Run 'make pack' first.", {
+      return new Response(`${filename} not found. Run 'make pack' first.`, {
         status: 404,
       })
     }
@@ -76,14 +86,9 @@ void Bun.serve({
 })
 
 console.log(`
-╔════════════════════════════════════════════════════════════════════════════╗
-║  ToastTV Dev Server                                                        ║
-╠════════════════════════════════════════════════════════════════════════════╣
-║                                                                            ║
-║  In your VM, run:                                                          ║
-║                                                                            ║
-║  curl -fsSL http://${LOCAL_IP}:${PORT}/install.sh \\                          ║
-║    | sudo LOCAL_SERVER=http://${LOCAL_IP}:${PORT} bash                        ║
-║                                                                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
+ToastTV Dev Server running at http://${LOCAL_IP}:${PORT}
+
+In your VM, run:
+
+  curl -fsSL http://${LOCAL_IP}:${PORT}/install.sh | sudo LOCAL_SERVER=http://${LOCAL_IP}:${PORT} VERSION=dev bash
 `)

@@ -88,7 +88,9 @@ export class MediaRepository implements IMediaRepository {
 
   async getAllSettings(): Promise<Record<string, string>> {
     if (!this.db) throw new Error('Repository not initialized')
-    const rows = this.db.prepare('SELECT key, value FROM settings').all() as Array<{
+    const rows = this.db
+      .prepare('SELECT key, value FROM settings')
+      .all() as Array<{
       key: string
       value: string
     }>
@@ -125,7 +127,7 @@ export class MediaRepository implements IMediaRepository {
     // 2. Simple ranges (Start <= End): e.g. 03-01 to 05-31. Current must be between.
     // 3. Wrap-around ranges (Start > End): e.g. 12-01 to 02-28. Current must be >= Start OR <= End.
     // NOTE: We assume dates are stored as 'MM-DD' or 'YYYY-MM-DD'. We compare substrings.
-    
+
     // SQLite substr(date, 6, 5) extracts 'MM-DD' from 'YYYY-MM-DD'.
     // If stored as 'MM-DD', we use it directly.
     // Current date passed in is YYYY-MM-DD. We extract MM-DD.
@@ -186,10 +188,10 @@ export class MediaRepository implements IMediaRepository {
     //    (Directory authority overrides manual 'Video' setting).
     // 3. Otherwise, preserve existing is_interlude (User might have manually tagged a Video as Interlude).
     // 4. Same logic for media_type apploes.
-    
+
     // Note: We use CASE statements for selective updates.
     // AND: We use COALESCE for dates to "backfill" defaults (from indexer) without overriding user settings.
-    
+
     const stmt = this.db.prepare(`
       INSERT INTO media (path, filename, duration_seconds, is_interlude, media_type, date_start, date_end)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -266,6 +268,17 @@ export class MediaRepository implements IMediaRepository {
     return row ? this.rowToMediaItem(row) : null
   }
 
+  async getByPath(path: string): Promise<MediaItem | null> {
+    if (!this.db) throw new Error('Repository not initialized')
+
+    const stmt = this.db.prepare(`
+      SELECT id, path, filename, duration_seconds, is_interlude, media_type, date_start, date_end
+      FROM media WHERE path = ?
+    `)
+    const row = stmt.get(path) as Record<string, unknown> | null
+    return row ? this.rowToMediaItem(row) : null
+  }
+
   async updateDates(
     id: number,
     dateStart: string | null,
@@ -298,16 +311,20 @@ export class MediaRepository implements IMediaRepository {
 
     if (validPaths.length === 0) {
       // Remove all entries
-      const countResult = this.db.prepare('SELECT COUNT(*) as count FROM media').get() as { count: number }
+      const countResult = this.db
+        .prepare('SELECT COUNT(*) as count FROM media')
+        .get() as { count: number }
       this.db.exec('DELETE FROM media')
       console.log(`Removed ${countResult.count} stale entries (no valid paths)`)
       return countResult.count
     }
 
     // Get all current paths in DB
-    const allPaths = this.db.prepare('SELECT path FROM media').all() as Array<{ path: string }>
+    const allPaths = this.db.prepare('SELECT path FROM media').all() as Array<{
+      path: string
+    }>
     const validPathSet = new Set(validPaths)
-    
+
     let removed = 0
     for (const { path } of allPaths) {
       if (!validPathSet.has(path)) {

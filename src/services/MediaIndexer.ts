@@ -90,9 +90,23 @@ export class MediaIndexer {
     let count = 0
     for (const filePath of files) {
       try {
-        const duration = await this.mediaProbe.getDuration(filePath)
         const filename = getFilename(filePath)
-        const mediaType = this.detectMediaType(filename, isInterlude, detectionOpts)
+
+        // Optimize: Check if file already exists in DB to reuse duration
+        const existing = await this.repository.getByPath(filePath)
+
+        let duration = 0
+        if (existing) {
+          duration = existing.durationSeconds
+        } else {
+          duration = await this.mediaProbe.getDuration(filePath)
+        }
+
+        const mediaType = this.detectMediaType(
+          filename,
+          isInterlude,
+          detectionOpts
+        )
 
         // Once we've detected an intro/outro, disable further detection for that type
         if (mediaType === 'intro') detectionOpts.detectIntro = false
@@ -112,7 +126,10 @@ export class MediaIndexer {
 
         outPaths.push(filePath)
         count++
-        console.log(`Indexed: ${filename} (${duration}s) [${mediaType}]`)
+
+        if (!existing) {
+          console.log(`Indexed: ${filename} (${duration}s) [${mediaType}]`)
+        }
       } catch (error) {
         console.error(`Failed to index ${filePath}:`, error)
       }
@@ -141,9 +158,12 @@ export class MediaIndexer {
     return this.scanAll()
   }
 
-  private detectDates(filename: string): { start: string | null; end: string | null } {
+  private detectDates(filename: string): {
+    start: string | null
+    end: string | null
+  } {
     const lower = filename.toLowerCase()
-    
+
     // Seasonal definitions (MM-DD)
     if (lower.includes('xmas') || lower.includes('christmas')) {
       return { start: '12-01', end: '12-26' }
@@ -155,18 +175,18 @@ export class MediaIndexer {
       return { start: '03-20', end: '04-30' }
     }
     if (lower.includes('spring')) {
-       return { start: '03-01', end: '05-31' }
+      return { start: '03-01', end: '05-31' }
     }
     if (lower.includes('summer')) {
-       return { start: '06-01', end: '08-31' }
+      return { start: '06-01', end: '08-31' }
     }
     if (lower.includes('autumn') || lower.includes('fall')) {
-       return { start: '09-01', end: '11-30' }
+      return { start: '09-01', end: '11-30' }
     }
     if (lower.includes('winter')) {
-       return { start: '12-01', end: '02-28' }
+      return { start: '12-01', end: '02-28' }
     }
-    
+
     return { start: null, end: null }
   }
 }
