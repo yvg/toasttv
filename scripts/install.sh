@@ -167,9 +167,8 @@ fi
 
 # --- Download Application ---
 step "Downloading ToastTV $VERSION"
-# Strip 'v' prefix for filename consistency (e.g. v0.3.0 -> 0.3.0)
-CLEAN_VERSION="${VERSION#v}"
-TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${CLEAN_VERSION}.tar.gz"
+# Use VERSION directory (e.g. 0.3.0 -> toasttv-0.3.0.tar.gz)
+TARBALL_URL="${REPO_URL}/releases/download/${VERSION}/toasttv-${VERSION}.tar.gz"
 TMP_DIR=$(mktemp -d)
 
 info "Downloading tarball..."
