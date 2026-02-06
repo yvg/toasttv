@@ -24,38 +24,20 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build Binary (ARM64)
+      - name: Package Release
         run: |
-          mkdir -p dist
-          # Compile to standalone binary for Linux ARM64 (Raspberry Pi 64-bit)
-          # --bytecode: Pre-compile into bytecode for faster startup
-          # --minify: Reduce file size
-          # Target must include 'bun-' prefix (e.g. bun-linux-arm64)
-          bun build --compile --minify --bytecode --target=bun-linux-arm64 --outfile=dist/toasttv ./src/main.ts
+          # Use our standard packing script
+          chmod +x scripts/pack.sh
+          ./scripts/pack.sh
+          
+          # Move artifacts to release folder for upload
+          mkdir -p release
+          mv dist/*.tar.gz release/
 
-      - name: Create Release Archive
-        run: |
-          mkdir -p release/toasttv
-          # Copy binary + assets
-          cp dist/toasttv release/toasttv/
-          cp -r public release/toasttv/
-          cp -r media release/toasttv/
-          # Copy data (config/logo) but exclude ignores
-          cp -r data release/toasttv/
-          
-          # Include useful scripts just in case
-          mkdir -p release/toasttv/scripts
-          cp scripts/install.sh release/toasttv/scripts/
-          
-          cp README.md release/toasttv/
-          cp LICENSE release/toasttv/
-          
-          # Create tarball
-          cd release
-          tar -czvf toasttv-${{ github.ref_name }}.tar.gz toasttv/
-
-      - name: Upload Release Asset
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: release/toasttv-*.tar.gz
+          files: |
+            release/toasttv-*.tar.gz
+            release/media.tar.gz
           generate_release_notes: true

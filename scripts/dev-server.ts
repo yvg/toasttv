@@ -7,7 +7,7 @@
  *   bun run scripts/dev-server.ts
  *
  * Then in VM:
- *   curl -fsSL http://<mac-ip>:3000/yvg/toasttv/main/scripts/install.sh | VERSION=dev sudo bash
+ *   curl -fsSL http://<mac-ip>:3000/install.sh | VERSION=dev sudo bash
  */
 
 import { file } from 'bun'

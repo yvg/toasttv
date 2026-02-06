@@ -12,7 +12,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
-VERSION="dev"
+# Detect Version (Env -> Package.json -> default)
+if [ -z "$VERSION" ]; then
+    VERSION=$(grep '"version":' package.json | head -1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
+fi
+VERSION=${VERSION:-dev}
 DIST_DIR="dist"
 RELEASE_DIR="$DIST_DIR/toasttv"
 
