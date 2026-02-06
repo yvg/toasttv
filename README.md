@@ -8,10 +8,10 @@ The anti-algorithm for tired parents and kids who just want to watch cartoons.
 
 <img src="docs/toasttv_hero.png" alt="A picture of 3 kids watching cartoons on a TV in a cozy 90s living room" />
 
-## Install (Raspberry Pi)
-
+### One-Line Install
+Run this on your Raspberry Pi (Lite or Desktop):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yvg/toasttv/main/scripts/install.sh | sudo bash
+curl -sL toasttv.eu/install.sh | sudo bash
 ```
 
 ## Getting Started
