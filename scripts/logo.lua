@@ -9,26 +9,14 @@ local current_path = nil
 local current_x = nil
 local current_y = nil
 
--- Helper to log to file
-local function log_debug(msg)
-    local f = io.open("/tmp/logo-debug.log", "a")
-    if f then
-        f:write(os.date("%H:%M:%S") .. " " .. msg .. "\n")
-        f:close()
-    end
-    mp.msg.info(msg)
-end
-
 -- Convert PNG to raw BGRA using ffmpeg, then add as overlay
 local function show_overlay(path, x, y)
-    log_debug("show_overlay called for: " .. (path or "nil"))
-
     if not path or path == "" then return end
     
     -- Check if file exists
     local check = io.open(path, "r")
     if not check then
-        log_debug("File not found: " .. path)
+        mp.msg.warn("File not found: " .. path)
         return
     end
     check:close()
@@ -41,7 +29,7 @@ local function show_overlay(path, x, y)
     })
     
     if result.status ~= 0 or not result.stdout then
-        log_debug("Failed to get dimensions. Status: " .. (result.status or "?"))
+        mp.msg.error("Failed to get image dimensions")
         return
     end
     
@@ -50,7 +38,7 @@ local function show_overlay(path, x, y)
     height = tonumber(height)
     
     if not width or not height then
-        log_debug("Invalid dimensions parsed: " .. (result.stdout or "nil"))
+        mp.msg.error("Invalid dimensions: " .. (result.stdout or "nil"))
         return
     end
     
@@ -62,7 +50,7 @@ local function show_overlay(path, x, y)
     })
     
     if conv.status ~= 0 then
-        log_debug("FFmpeg conversion failed. Status: " .. (conv.status or "?"))
+        mp.msg.error("Failed to convert image to raw BGRA")
         return
     end
     
@@ -76,8 +64,6 @@ local function show_overlay(path, x, y)
     local pos_x = osd_w - width - (x or 10)
     local pos_y = y or 10
     
-    log_debug("Adding overlay at " .. pos_x .. "," .. pos_y .. " Size: " .. width .. "x" .. height)
-
     -- Add overlay
     mp.commandv("overlay-add", overlay_id, pos_x, pos_y, raw_path, 
                 0, "bgra", width, height, width * 4)
@@ -86,6 +72,7 @@ local function show_overlay(path, x, y)
     current_path = path
     current_x = x
     current_y = y
+    mp.msg.info("Logo overlay added at " .. pos_x .. "," .. pos_y)
 end
 
 
