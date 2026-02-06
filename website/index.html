@@ -299,8 +299,8 @@
       </p>
 
       <div class="install-block" onclick="navigator.clipboard.writeText(this.innerText.replace('root@raspberrypi:~# ', '').trim()); alert('Copied!')" title="Click to Copy">
-        <!-- Install via GitHub -->
-        curl -fsSL https://raw.githubusercontent.com/yvg/toasttv/main/scripts/install.sh | sudo bash
+        <!-- Install via ToastTV.eu -->
+        curl -sL toasttv.eu/install.sh | sudo bash
       </div>
 
     </div>
@@ -357,15 +357,30 @@
     <p>
       Built for curious kids and tired parents.<br>
       <br>
+      <style>
+        .retro-badge {
+          width: 125px;
+          height: 23px;
+          background-image: url('assets/badges_sheet.png');
+          background-repeat: no-repeat;
+          background-size: 127px;
+          display: inline-block;
+          image-rendering: pixelated; /* Essential for crisp pixel art */
+        }
+        .badge-pi        { background-position: -1px -1px; }
+        .badge-colortv   { background-position: -1px -26px; }
+        .badge-noads     { background-position: -1px -52px; }
+        .badge-algofree  { background-position: -1px -78px; }
+        .badge-zerocloud { background-position: -1px -104px; }
+      </style>
+
       <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; opacity: 0.9;">
-        <img src="assets/badge_pi.png" alt="Powered by Raspberry Pi" width="88" height="31" style="image-rendering: pixelated;">
-        <img src="assets/badge_colortv.png" alt="Color TV" width="88" height="31" style="image-rendering: pixelated;">
-        <img src="assets/badge_noads.png" alt="No Ads" width="88" height="31" style="image-rendering: pixelated;">
-        <img src="assets/badge_algofree.png" alt="Algorithm Free" width="88" height="31" style="image-rendering: pixelated;">
-        <img src="assets/badge_zerocloud.png" alt="Zero Cloud" width="88" height="31" style="image-rendering: pixelated;">
+        <div class="retro-badge badge-pi" title="Powered by Raspberry Pi"></div>
+        <div class="retro-badge badge-colortv" title="Color TV"></div>
+        <div class="retro-badge badge-noads" title="No Ads"></div>
+        <div class="retro-badge badge-algofree" title="Algorithm Free"></div>
+        <div class="retro-badge badge-zerocloud" title="Zero Cloud"></div>
       </div>
-      <br>
-      <br>
       by <a href="https://yves.vg">yvg</a>
     </p>
   </footer>
