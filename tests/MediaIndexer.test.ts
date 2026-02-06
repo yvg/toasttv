@@ -141,4 +141,53 @@ describe('MediaIndexer', () => {
       })
     )
   })
+
+  test('scanAll detects special media types', async () => {
+    fs.listFiles
+      .mockReturnValueOnce([
+        '/media/videos/mylogo_intro.mp4',
+        '/media/videos/other_intro.mp4',
+        '/media/videos/sleepy_bedtime.mp4',
+        '/media/videos/credits_outro.mp4',
+      ])
+      .mockReturnValueOnce([])
+
+    await indexer.scanAll()
+
+    // Verify Intro 1
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'mylogo_intro.mp4',
+        mediaType: 'intro',
+        isInterlude: false,
+      })
+    )
+
+    // Verify Intro 2 (Should now be intro, not video - BUG FIX)
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'other_intro.mp4',
+        mediaType: 'intro',
+        isInterlude: false,
+      })
+    )
+
+    // Verify Bedtime -> maps to offair
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'sleepy_bedtime.mp4',
+        mediaType: 'offair',
+        isInterlude: false,
+      })
+    )
+
+    // Verify Outro
+    expect(repo.upsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'credits_outro.mp4',
+        mediaType: 'outro',
+        isInterlude: false,
+      })
+    )
+  })
 })

@@ -160,4 +160,91 @@ describe('MediaRepository', () => {
     expect(item?.isInterlude).toBe(true)
     expect(item?.mediaType).toBe('interlude')
   })
+
+  test('upsert special types override existing interlude', async () => {
+    // Simulate: File was previously indexed as interlude (before detection fix)
+    await repo.upsertMedia({
+      path: '/interludes/penny_outro.mp4',
+      filename: 'penny_outro.mp4',
+      durationSeconds: 30,
+      isInterlude: true,
+      mediaType: 'interlude', // Old indexer didn't detect special type
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    // Verify it's interlude
+    let item = (await repo.getAll())[0]
+    expect(item?.mediaType).toBe('interlude')
+
+    // Re-scan with fixed indexer that detects _outro pattern
+    await repo.upsertMedia({
+      path: '/interludes/penny_outro.mp4',
+      filename: 'penny_outro.mp4',
+      durationSeconds: 30,
+      isInterlude: false, // outro is not a generic interlude
+      mediaType: 'outro', // NEW: Detected as outro
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    // Should now be outro (special types override)
+    item = (await repo.getAll())[0]
+    expect(item?.mediaType).toBe('outro')
+    expect(item?.isInterlude).toBe(false)
+  })
+
+  test('upsert offair overrides existing interlude', async () => {
+    // Simulate: bedtime file was indexed as interlude
+    await repo.upsertMedia({
+      path: '/interludes/penny_bedtime.mp4',
+      filename: 'penny_bedtime.mp4',
+      durationSeconds: 30,
+      isInterlude: true,
+      mediaType: 'interlude',
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    // Re-scan detects _bedtime -> offair
+    await repo.upsertMedia({
+      path: '/interludes/penny_bedtime.mp4',
+      filename: 'penny_bedtime.mp4',
+      durationSeconds: 30,
+      isInterlude: false,
+      mediaType: 'offair',
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    const item = (await repo.getAll())[0]
+    expect(item?.mediaType).toBe('offair')
+  })
+
+  test('upsert intro overrides existing interlude', async () => {
+    // Simulate: intro file was indexed as interlude
+    await repo.upsertMedia({
+      path: '/interludes/penny_intro.mp4',
+      filename: 'penny_intro.mp4',
+      durationSeconds: 30,
+      isInterlude: true,
+      mediaType: 'interlude',
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    // Re-scan detects _intro
+    await repo.upsertMedia({
+      path: '/interludes/penny_intro.mp4',
+      filename: 'penny_intro.mp4',
+      durationSeconds: 30,
+      isInterlude: false,
+      mediaType: 'intro',
+      dateStart: null,
+      dateEnd: null,
+    })
+
+    const item = (await repo.getAll())[0]
+    expect(item?.mediaType).toBe('intro')
+  })
 })

@@ -78,11 +78,11 @@ make test      # Run tests
 Test the install flow locally using a Raspberry Pi VM (or any ARM64 VM):
 
 ```bash
-# On your Mac: start the dev server
+# On your computer: start the dev server
 make serve-local
 
-# In the VM: curl install from your Mac
-curl -fsSL http://<mac-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<mac-ip>:3000 VERSION=dev bash
+# In the VM: curl install from your computer
+curl -fsSL http://<computer-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<computer-ip>:3000 VERSION=dev bash
 ```
 
 This builds a fresh tarball and serves it via a local HTTP server that mocks GitHub release endpoints.

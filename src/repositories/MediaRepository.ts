@@ -184,10 +184,9 @@ export class MediaRepository implements IMediaRepository {
 
     // On conflict:
     // 1. Always update filename and duration (file system truth)
-    // 2. If 'excluded.is_interlude' is 1 (file is in interlude folder), FORCE update to interlude.
-    //    (Directory authority overrides manual 'Video' setting).
-    // 3. Otherwise, preserve existing is_interlude (User might have manually tagged a Video as Interlude).
-    // 4. Same logic for media_type apploes.
+    // 2. Special types (intro, outro, offair) detected from filename ALWAYS override.
+    // 3. If file is in interlude folder (excluded.media_type = 'interlude'), force interlude.
+    // 4. Otherwise, preserve existing media_type (respects user manual changes).
 
     // Note: We use CASE statements for selective updates.
     // AND: We use COALESCE for dates to "backfill" defaults (from indexer) without overriding user settings.
@@ -199,10 +198,12 @@ export class MediaRepository implements IMediaRepository {
         filename = excluded.filename,
         duration_seconds = excluded.duration_seconds,
         is_interlude = CASE 
+          WHEN excluded.media_type IN ('intro', 'outro', 'offair') THEN excluded.is_interlude
           WHEN excluded.is_interlude = 1 THEN 1 
           ELSE media.is_interlude 
         END,
         media_type = CASE 
+          WHEN excluded.media_type IN ('intro', 'outro', 'offair') THEN excluded.media_type
           WHEN excluded.media_type = 'interlude' THEN 'interlude' 
           ELSE media.media_type 
         END,

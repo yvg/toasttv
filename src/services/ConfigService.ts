@@ -88,18 +88,27 @@ export class ConfigService {
    * Auto-discover special media (intro/outro/off-air) by filename patterns.
    * This is business logic that belongs in the service layer.
    * Called during app initialization after media indexing.
+   *
+   * Also validates existing IDs and updates if they're stale (file no longer exists).
    */
   async discoverSpecialMedia(
     allMedia: Array<{ id: number; filename: string }>
   ): Promise<void> {
     const currentConfig = await this.get()
+    const mediaIds = new Set(allMedia.map((m) => m.id))
 
-    // Intro - look for _intro or penny_and_chip_splash
-    if (!currentConfig.session.introVideoId) {
+    // Helper: Check if ID is missing or stale
+    const needsUpdate = (id: number | null | undefined): boolean => {
+      if (!id) return true
+      return !mediaIds.has(id) // ID doesn't exist in current media
+    }
+
+    // Intro - look for _intro or _splash patterns
+    if (needsUpdate(currentConfig.session.introVideoId)) {
       const intro = allMedia.find(
         (m) =>
-          m.filename.includes('_intro') ||
-          m.filename.includes('penny_and_chip_splash')
+          m.filename.toLowerCase().includes('_intro') ||
+          m.filename.toLowerCase().includes('_splash')
       )
       if (intro) {
         await this.repository.update({ session: { introVideoId: intro.id } })
@@ -108,17 +117,23 @@ export class ConfigService {
     }
 
     // Outro - look for _outro
-    if (!currentConfig.session.outroVideoId) {
-      const outro = allMedia.find((m) => m.filename.includes('_outro'))
+    if (needsUpdate(currentConfig.session.outroVideoId)) {
+      const outro = allMedia.find((m) =>
+        m.filename.toLowerCase().includes('_outro')
+      )
       if (outro) {
         await this.repository.update({ session: { outroVideoId: outro.id } })
         console.log(`Auto-configured outro video: ${outro.filename}`)
       }
     }
 
-    // Off-air screen - look for bedtime
-    if (!currentConfig.session.offAirAssetId) {
-      const offair = allMedia.find((m) => m.filename.includes('bedtime'))
+    // Off-air screen - look for _bedtime or _offair
+    if (needsUpdate(currentConfig.session.offAirAssetId)) {
+      const offair = allMedia.find(
+        (m) =>
+          m.filename.toLowerCase().includes('_bedtime') ||
+          m.filename.toLowerCase().includes('_offair')
+      )
       if (offair) {
         await this.repository.update({ session: { offAirAssetId: offair.id } })
         console.log(`Auto-configured off-air screen: ${offair.filename}`)

@@ -2,12 +2,13 @@
  * Local Dev Server for ToastTV
  *
  * Mocks GitHub release endpoints so VMs can curl-install from your Mac.
+ * Auto-detects version from package.json.
  *
  * Usage:
- *   bun run scripts/dev-server.ts
+ *   make serve-local
  *
  * Then in VM:
- *   curl -fsSL http://<mac-ip>:3000/install.sh | VERSION=dev sudo bash
+ *   curl -fsSL http://<mac-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<mac-ip>:3000 bash
  */
 
 import { file } from 'bun'
@@ -43,9 +44,10 @@ void Bun.serve({
 
     console.log(`[dev-server] ${req.method} ${path}`)
 
-    // GitHub API: Latest release
+    // GitHub API: Latest release - return actual version from package.json
     if (path === '/repos/yvg/toasttv/releases/latest') {
-      return Response.json({ tag_name: 'dev' })
+      const pkg = await file(join(PROJECT_ROOT, 'package.json')).json()
+      return Response.json({ tag_name: pkg.version })
     }
 
     // Tarball download (App or Media)
@@ -53,7 +55,14 @@ void Bun.serve({
     const appMatch = path.match(/\/releases\/download\/.*\/toasttv-.*\.tar\.gz/)
 
     if (appMatch || mediaMatch) {
-      const filename = mediaMatch ? 'media.tar.gz' : 'toasttv-dev.tar.gz'
+      let filename: string
+      if (mediaMatch) {
+        filename = 'media.tar.gz'
+      } else {
+        // Use actual version from package.json
+        const pkg = await file(join(PROJECT_ROOT, 'package.json')).json()
+        filename = `toasttv-${pkg.version}.tar.gz`
+      }
       const tarball = file(join(PROJECT_ROOT, `dist/${filename}`))
 
       if (await tarball.exists()) {
@@ -90,5 +99,5 @@ ToastTV Dev Server running at http://${LOCAL_IP}:${PORT}
 
 In your VM, run:
 
-  curl -fsSL http://${LOCAL_IP}:${PORT}/install.sh | sudo LOCAL_SERVER=http://${LOCAL_IP}:${PORT} VERSION=dev bash
+  curl -fsSL http://${LOCAL_IP}:${PORT}/install.sh | sudo LOCAL_SERVER=http://${LOCAL_IP}:${PORT} bash
 `)

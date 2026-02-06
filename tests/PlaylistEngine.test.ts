@@ -181,4 +181,30 @@ describe('PlaylistEngine', () => {
     expect(session.skipQuotaForToday).toHaveBeenCalled()
     expect(engine.isQuotaSkipped()).toBe(true)
   })
+
+  test('excludes special types (offair) from regular rotation', async () => {
+    const v1 = createVideo(1)
+    const offair = createVideo(2, {
+      mediaType: 'offair',
+      filename: 'sleep_offair.mp4',
+    })
+
+    // Repository returns both
+    repo.getAll.mockReturnValue(Promise.resolve([v1, offair]))
+
+    await engine.startSession()
+
+    // First video should be v1
+    const first = await engine.getNextVideo()
+    expect(first).toEqual(v1)
+
+    // Next should be null (offair excluded) - or if queue is empty/done
+    // Since we only have 1 valid video in deck, deck.draw() will eventually return null
+    // But since session maintains queue, we check that offair NEVER appears.
+
+    // We can peek queue to be sure
+    const queue = engine.peekQueue(10)
+    const hasOffair = queue.some((m) => m.mediaType === 'offair')
+    expect(hasOffair).toBe(false)
+  })
 })

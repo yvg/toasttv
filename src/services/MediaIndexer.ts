@@ -15,11 +15,6 @@ import type {
   MediaType,
 } from '../types'
 
-interface ConventionDetectionOpts {
-  detectIntro: boolean
-  detectOutro: boolean
-}
-
 export class MediaIndexer {
   constructor(
     private readonly mediaConfig: MediaConfig,
@@ -33,20 +28,11 @@ export class MediaIndexer {
     const videoPaths: string[] = []
     const interludePaths: string[] = []
 
-    // Check if intro/outro already assigned - only apply convention if not
-    const existingIntro = await this.repository.getByType('intro')
-    const existingOutro = await this.repository.getByType('outro')
-    const detectionOpts: ConventionDetectionOpts = {
-      detectIntro: existingIntro === null,
-      detectOutro: existingOutro === null,
-    }
-
     // Scan videos (exclude interlude directory to prevent double counting)
     const videoCount = await this.scanDirectory(
       this.mediaConfig.directory,
       false,
       videoPaths,
-      detectionOpts,
       [this.interludeConfig.directory]
     )
 
@@ -54,8 +40,7 @@ export class MediaIndexer {
     const interludeCount = await this.scanDirectory(
       this.interludeConfig.directory,
       true,
-      interludePaths,
-      detectionOpts
+      interludePaths
     )
 
     // Remove DB entries for files that no longer exist
@@ -73,7 +58,6 @@ export class MediaIndexer {
     directory: string,
     isInterlude: boolean,
     outPaths: string[],
-    detectionOpts: ConventionDetectionOpts,
     excludePaths: string[] = []
   ): Promise<number> {
     if (!this.filesystem.exists(directory)) {
@@ -102,15 +86,7 @@ export class MediaIndexer {
           duration = await this.mediaProbe.getDuration(filePath)
         }
 
-        const mediaType = this.detectMediaType(
-          filename,
-          isInterlude,
-          detectionOpts
-        )
-
-        // Once we've detected an intro/outro, disable further detection for that type
-        if (mediaType === 'intro') detectionOpts.detectIntro = false
-        if (mediaType === 'outro') detectionOpts.detectOutro = false
+        const mediaType = this.detectMediaType(filename, isInterlude)
 
         const { start: dateStart, end: dateEnd } = this.detectDates(filename)
 
@@ -140,17 +116,16 @@ export class MediaIndexer {
 
   /**
    * Detect media type from filename conventions.
-   * Patterns: `_intro` → intro, `_outro` → outro
-   * Only applies if detection is enabled (no existing intro/outro in DB).
+   * Patterns:
+   * - `_intro` or `_splash` → intro
+   * - `_outro` → outro
+   * - `_bedtime` or `_offair` → offair
    */
-  private detectMediaType(
-    filename: string,
-    isInterlude: boolean,
-    opts: ConventionDetectionOpts
-  ): MediaType {
+  private detectMediaType(filename: string, isInterlude: boolean): MediaType {
     const lower = filename.toLowerCase()
-    if (opts.detectIntro && lower.includes('_intro')) return 'intro'
-    if (opts.detectOutro && lower.includes('_outro')) return 'outro'
+    if (lower.includes('_intro') || lower.includes('_splash')) return 'intro'
+    if (lower.includes('_outro')) return 'outro'
+    if (lower.includes('_bedtime') || lower.includes('_offair')) return 'offair'
     return isInterlude ? 'interlude' : 'video'
   }
 

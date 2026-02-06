@@ -336,7 +336,10 @@ export class PlaylistEngine {
     // Exclude interludes, intro, and outro from regular videos (they are handled specially)
     this.cachedVideos = all.filter(
       (m) =>
-        !m.isInterlude && m.mediaType !== 'intro' && m.mediaType !== 'outro'
+        !m.isInterlude &&
+        m.mediaType !== 'intro' &&
+        m.mediaType !== 'outro' &&
+        m.mediaType !== 'offair'
     )
     // Special videos (intro/outro) are cached for lookup but not shuffled
     this.cachedSpecialVideos = all.filter(
