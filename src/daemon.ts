@@ -12,6 +12,7 @@ import { FilesystemClient } from './clients/FilesystemClient'
 import { FFProbeClient } from './clients/FilesystemClient'
 import { MpvClient } from './clients/MpvClient'
 import { CECClient, CEC_KEYS } from './clients/CECClient'
+
 import { MediaIndexer } from './services/MediaIndexer'
 import {
   PlaylistEngine,
@@ -20,6 +21,7 @@ import {
 import { SessionManager } from './services/SessionManager'
 import { ConfigService } from './services/ConfigService'
 import { PlaybackService } from './services/PlaybackService'
+import { TVDetectionService } from './services/TVDetectionService'
 import type { MediaItem, ToastTVConfig, IMediaPlayer } from './types'
 
 export class ToastTVDaemon {
@@ -32,6 +34,8 @@ export class ToastTVDaemon {
   private engine: PlaylistEngine | null = null
   private playbackService: PlaybackService | null = null
   private configService: ConfigService | null = null
+  private detectionService: TVDetectionService | null = null
+  private cecClient: CECClient | null = null
 
   constructor(configPath = './data/config.json') {
     this.appConfig = new ConfigRepository(configPath)
@@ -199,73 +203,107 @@ export class ToastTVDaemon {
       })
     }
 
-    // Try to start CEC listener (optional, may not be available on all systems)
+    // Try to start TV detection (CEC + heartbeat)
     try {
-      await this.initializeCEC()
-    } catch {
-      console.log('CEC not available (this is optional)')
+      await this.initializeDetection(runtimeConfig)
+    } catch (e) {
+      console.log('TV Detection not available (this is optional):', e)
     }
 
     this.running = true
     console.log('ToastTV daemon fully operational')
   }
 
-  private async initializeCEC(): Promise<void> {
+  private async initializeDetection(config: AppConfig): Promise<void> {
     if (!this.playbackService) return
-    const cec = new CECClient()
     const playback = this.playbackService
 
-    // Map remote buttons to actions via PlaybackService
-    cec.onPowerOn(() => {
-      console.log('CEC: TV turned on, starting session')
+    // Create clients based on config
+    let cec: CECClient | null = null
+
+    if (config.detection.cecEnabled) {
+      try {
+        cec = new CECClient()
+        this.cecClient = cec
+
+        // Wire up remote control buttons (separate from detection)
+        cec.onKeyPress(CEC_KEYS.PLAY, () => {
+          console.log('CEC: PLAY - starting session')
+          void playback.startSession()
+        })
+
+        cec.onKeyPress(CEC_KEYS.PAUSE, () => {
+          console.log('CEC: PAUSE - toggling pause')
+          void playback.pause()
+        })
+
+        cec.onKeyPress(CEC_KEYS.STOP, () => {
+          console.log('CEC: STOP - ending session')
+          void playback.endSession()
+        })
+
+        cec.onKeyPress(CEC_KEYS.FORWARD, () => {
+          console.log('CEC: FORWARD - skipping to next video')
+          void playback.skip()
+        })
+
+        cec.onKeyPress(CEC_KEYS.RIGHT, () => {
+          console.log('CEC: RIGHT - skipping to next video')
+          void playback.skip()
+        })
+
+        cec.onKeyPress(CEC_KEYS.SELECT, () => {
+          if (playback.isSessionActive) {
+            console.log('CEC: SELECT - toggling pause')
+            void playback.pause()
+          } else {
+            console.log('CEC: SELECT - starting session')
+            void playback.startSession()
+          }
+        })
+
+        await cec.start()
+        console.log('CEC listener started')
+      } catch (e) {
+        console.log('CEC not available:', e)
+        cec = null
+      }
+    }
+
+    // Create detection service
+    this.detectionService = new TVDetectionService({
+      cec,
+      config: config.detection,
+    })
+
+    // Wire detection to playback
+    this.detectionService.onTVActive(() => {
+      console.log('TV Active: Starting session')
       void playback.startSession()
     })
 
-    cec.onKeyPress(CEC_KEYS.PLAY, () => {
-      console.log('CEC: PLAY - starting session')
-      void playback.startSession()
-    })
-
-    cec.onKeyPress(CEC_KEYS.PAUSE, () => {
-      console.log('CEC: PAUSE - toggling pause')
-      void playback.pause()
-    })
-
-    cec.onKeyPress(CEC_KEYS.STOP, () => {
-      console.log('CEC: STOP - ending session')
+    this.detectionService.onTVInactive(() => {
+      console.log('TV Inactive: Ending session')
       void playback.endSession()
     })
 
-    cec.onKeyPress(CEC_KEYS.FORWARD, () => {
-      console.log('CEC: FORWARD - skipping to next video')
-      void playback.skip()
-    })
-
-    cec.onKeyPress(CEC_KEYS.RIGHT, () => {
-      console.log('CEC: RIGHT - skipping to next video')
-      void playback.skip()
-    })
-
-    cec.onKeyPress(CEC_KEYS.SELECT, () => {
-      // Toggle play/pause
-      if (playback.isSessionActive) {
-        console.log('CEC: SELECT - toggling pause')
-        void playback.pause()
-      } else {
-        console.log('CEC: SELECT - starting session')
-        void playback.startSession()
-      }
-    })
-
-    // TODO: Add power off detection to end session
-
-    await cec.start()
-    console.log('CEC listener started')
+    await this.detectionService.start()
+    console.log('TV Detection Service started')
   }
 
   async stop(): Promise<void> {
     console.log('ToastTV daemon stopping...')
     this.running = false
+
+    // Stop detection service
+    if (this.detectionService) {
+      this.detectionService.stop()
+    }
+
+    // Stop clients
+    if (this.cecClient) {
+      await this.cecClient.stop()
+    }
 
     if (this.engine && this.engine.isSessionActive) {
       await this.engine.endSession()

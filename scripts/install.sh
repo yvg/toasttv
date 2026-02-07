@@ -122,7 +122,7 @@ step "Installing system dependencies"
 info "Checking system dependencies..."
 # apt-get update -qq  <-- Removed eager update
 
-PACKAGES="mpv ffmpeg cec-utils"
+PACKAGES="mpv ffmpeg cec-utils unzip"
 for pkg in $PACKAGES; do
     printf "    %-12s" "$pkg"
     if dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -170,11 +170,11 @@ if [[ -x "$BUN_INSTALL_DIR/bin/bun" ]]; then
         echo -e "${YELLOW}(Bun $CURRENT_BUN already installed)${NC}"
     else
         echo -e "${CYAN}Bun $CURRENT_BUN detected. Downgrading to 1.3.6 for Pi Zero 2 W compatibility...${NC}"
-        curl -fsSL https://bun.sh/install | bash -s -- bun-v1.3.6 >/dev/null 2>&1
+        BUN_INSTALL="$BUN_INSTALL_DIR" curl -fsSL https://bun.sh/install | BUN_INSTALL="$BUN_INSTALL_DIR" bash -s -- bun-v1.3.6
     fi
 else
     info "Installing Bun 1.3.6 (required for ARM64 compatibility)..."
-    curl -fsSL https://bun.sh/install | bash -s -- bun-v1.3.6 >/dev/null 2>&1
+    BUN_INSTALL="$BUN_INSTALL_DIR" curl -fsSL https://bun.sh/install | BUN_INSTALL="$BUN_INSTALL_DIR" bash -s -- bun-v1.3.6
     log "Bun 1.3.6 installed"
 fi
 
@@ -342,7 +342,7 @@ fi
 # 1. Start MPV in background
 rm -f $MPV_SOCKET
 echo "Starting MPV daemon..."
-mpv --idle --input-ipc-server=$MPV_SOCKET --include=$INSTALL_DIR/data/mpv.conf --vo=gpu --gpu-context=drm --hwdec=auto --script=$INSTALL_DIR/scripts/logo.lua --no-terminal > /tmp/mpv.log 2>&1 &
+mpv --idle --input-ipc-server=$MPV_SOCKET --include=$INSTALL_DIR/data/mpv.conf --script=$INSTALL_DIR/scripts/logo.lua --no-terminal > /tmp/mpv.log 2>&1 &
 MPV_PID=$!
 
 # Wait for socket
@@ -365,7 +365,7 @@ echo "🍞 ToastTV starting..."
 
 # Run with local Bun
 export BUN_INSTALL="/opt/toasttv/.bun"
-$BUN_INSTALL/bin/bun run $INSTALL_DIR/bin/server.js
+$BUN_INSTALL/bin/bun --smol run $INSTALL_DIR/bin/server.js
 
 # Cleanup when app exits
 echo "Stopping MPV..."

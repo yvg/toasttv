@@ -41,6 +41,10 @@ export interface AppConfig {
     x: number
     y: number
   }
+  detection: {
+    cecEnabled: boolean
+    heartbeatIntervalMs: number
+  }
 }
 
 export type DeepPartial<T> = {
@@ -79,6 +83,10 @@ const DEFAULT_CONFIG: AppConfig = {
     position: 6, // Top-Right
     x: 8,
     y: 8,
+  },
+  detection: {
+    cecEnabled: true,
+    heartbeatIntervalMs: 30000,
   },
 }
 
@@ -198,6 +206,13 @@ export class ConfigRepository {
         position: parseInt(s['logo.position'] ?? '6', 10),
         x: parseInt(s['logo.x'] ?? '8', 10),
         y: parseInt(s['logo.y'] ?? '8', 10),
+      },
+      detection: {
+        cecEnabled: s['detection.cecEnabled'] !== 'false',
+        heartbeatIntervalMs: parseInt(
+          s['detection.heartbeatIntervalMs'] ?? '30000',
+          10
+        ),
       },
     }
   }

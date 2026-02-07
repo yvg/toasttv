@@ -9,7 +9,6 @@ The anti-algorithm for tired parents and kids who just want to watch cartoons.
 <img src="docs/toasttv_hero.png" alt="A picture of 3 kids watching cartoons on a TV in a cozy 90s living room" />
 
 ### One-Line Install
-Run this on your Raspberry Pi (Lite or Desktop):
 ```bash
 curl -sL toasttv.eu/install.sh | sudo bash
 ```
@@ -63,19 +62,12 @@ ToastTV works out of the box. It includes a full "broadcast day" so you can test
 Three episodes of **[Caminandes](https://studio.blender.org/films/caminandes-1/)** (by Blender Studio, CC-BY) are included.
 
 The mascots **Penny & Chip** are ready to run your station.
-- **Good morning!** — Penny signs on.
-- **Bumpers** — Chip keeps the flow moving.
-- **Bedtime** — Penny signs off.
-- **Seasonal** — They even celebrate holidays.
+- **Good morning!** — They sign on together.
+- **Bumpers** — They keep the flow moving.
+- **Bedtime** — They sign off for the night.
+- **Seasonal** — They celebrate holidays together.
 
 <img src="docs/penny_and_chip.png" alt="Penny & Chip" width="400">
-
-
-
-
-## Tech Stack
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for tech stack, and design decisions.
 
 ## Development
 
@@ -86,7 +78,7 @@ make dev       # Start with watch mode
 make test      # Run tests
 ```
 
-### Simulator Testing
+### RPi Simulator Testing
 
 Test the install flow locally using a Raspberry Pi VM (or any ARM64 VM):
 
@@ -99,6 +91,26 @@ curl -fsSL http://<computer-ip>:3000/install.sh | sudo LOCAL_SERVER=http://<comp
 ```
 
 This builds a fresh tarball and serves it via a local HTTP server that mocks GitHub release endpoints.
+
+### TV Simulation (Black-Box Testing)
+
+For testing detection in a VM without real hardware:
+
+```bash
+# Deploy mock scripts to VM (one-time)
+TVSIM_HOST=dietpi@192.168.x.x make tvsim
+
+# On VM: simulate TV events
+./tv-sim.sh on          # TV power on
+./tv-sim.sh off         # TV standby
+./tv-sim.sh hdmi-plug   # HDMI cable connected
+./tv-sim.sh hdmi-unplug # HDMI disconnected
+./tv-sim.sh status      # Show current state
+```
+
+### Tech Stack
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for tech stack, and design decisions.
 
 ## License
 

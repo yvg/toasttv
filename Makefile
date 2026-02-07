@@ -85,3 +85,19 @@ pack:
 
 serve-local: pack
 	@$(BUN) run scripts/dev-server.ts
+
+# Deploy TV simulation scripts to VM for black-box testing
+# Usage: TVSIM_HOST=dietpi@192.168.x.x make tvsim
+tvsim:
+	@if [ -z "$(TVSIM_HOST)" ]; then \
+		echo "Usage: TVSIM_HOST=user@host make tvsim"; \
+		echo "Example: TVSIM_HOST=dietpi@192.168.1.50 make tvsim"; \
+		exit 1; \
+	fi
+	@echo "Deploying TV simulation scripts to $(TVSIM_HOST)..."
+	@tar --no-xattrs -cf - -C scripts tv-sim.sh -C vm-testing mock-cec-client mock-udevadm 2>/dev/null | \
+		ssh $(TVSIM_HOST) 'cd ~ && tar --warning=no-timestamp -xf - && chmod +x tv-sim.sh mock-cec-client mock-udevadm && sudo ./tv-sim.sh setup'
+	@echo ""
+	@echo "✓ Deployed! On VM run: ./tv-sim.sh on|off|status"
+
+

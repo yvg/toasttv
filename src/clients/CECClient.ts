@@ -14,6 +14,9 @@ export class CECClient {
   private running = false
 
   private onPowerOnCallback: CECCallback | null = null
+  private onStandbyCallback: CECCallback | null = null
+  private onActiveSourceCallback: CECCallback | null = null
+  private onInactiveSourceCallback: CECCallback | null = null
   private keyCallbacks: Map<string, CECCallback> = new Map()
 
   async start(): Promise<void> {
@@ -49,6 +52,18 @@ export class CECClient {
     this.onPowerOnCallback = callback
   }
 
+  onStandby(callback: CECCallback): void {
+    this.onStandbyCallback = callback
+  }
+
+  onActiveSource(callback: CECCallback): void {
+    this.onActiveSourceCallback = callback
+  }
+
+  onInactiveSource(callback: CECCallback): void {
+    this.onInactiveSourceCallback = callback
+  }
+
   onKeyPress(key: string, callback: CECCallback): void {
     this.keyCallbacks.set(key.toLowerCase(), callback)
   }
@@ -80,12 +95,50 @@ export class CECClient {
       console.log(`CEC RAW: ${line}`)
     }
 
-    // Detect TV power on
-    if (line.includes('standby') && line.includes('>> 0f:')) {
-      // Ignore standby
-    } else if (line.includes('power on') || line.includes('>> 0f:04')) {
+    // Detect TV standby (TV going to sleep)
+    // 0f:36 is the CEC standby broadcast opcode
+    if (
+      (line.includes('standby') && line.includes('>> 0f:')) ||
+      line.includes('>> 0f:36')
+    ) {
+      console.log('CEC: TV Standby detected')
+      this.onStandbyCallback?.()
+      return
+    }
+
+    if (line.includes('power on') || line.includes('>> 0f:04')) {
       console.log('CEC: TV Power On detected')
       this.onPowerOnCallback?.()
+      return
+    }
+
+    // Detect active source changes
+    // >> 0f:82:XX:YY - Active Source broadcast (XX:YY is physical address)
+    // We are active if the physical address matches ours
+    if (line.match(/<< \w+:82:/i)) {
+      // We became the active source (we sent this)
+      console.log('CEC: We are now active source')
+      this.onActiveSourceCallback?.()
+      return
+    }
+
+    // >> XY:82:XX:YY from another device - someone else is now active
+    const activeSourceMatch = line.match(/>> (\w+):82:/i)
+    if (activeSourceMatch) {
+      // Another device became active - we are now inactive
+      console.log('CEC: Another device is now active source')
+      this.onInactiveSourceCallback?.()
+      return
+    }
+
+    // Detect routing change (TV switched input)
+    // >> 0f:80:XX:YY:ZZ:WW - Routing Change
+    if (line.includes(':80:')) {
+      console.log('CEC: Routing change detected')
+      // Could be us or someone else - would need to parse addresses
+      // For now, treat as potential inactive
+      this.onInactiveSourceCallback?.()
+      return
     }
 
     // Method 1: Parse text format (some TVs output this)
@@ -115,6 +168,49 @@ export class CECClient {
     console.log(`CEC: Key pressed - ${key}`)
     const callback = this.keyCallbacks.get(key)
     callback?.()
+  }
+
+  /**
+   * Query TV power state via CEC.
+   * Spawns: echo "pow 0" | cec-client -s -d 1
+   * Returns: 'on', 'standby', or 'unknown'
+   */
+  async getPowerState(): Promise<'on' | 'standby' | 'unknown'> {
+    try {
+      const proc = Bun.spawn(
+        ['sh', '-c', 'echo "pow 0" | cec-client -s -d 1'],
+        {
+          stdout: 'pipe',
+          stderr: 'pipe',
+        }
+      )
+
+      // Set a timeout for the query (5 seconds)
+      const timeoutPromise = new Promise<'unknown'>((resolve) => {
+        setTimeout(() => {
+          proc.kill()
+          resolve('unknown')
+        }, 5000)
+      })
+
+      const resultPromise = (async (): Promise<
+        'on' | 'standby' | 'unknown'
+      > => {
+        const output = await new Response(proc.stdout).text()
+
+        if (output.includes('power status: on')) {
+          return 'on'
+        } else if (output.includes('power status: standby')) {
+          return 'standby'
+        }
+        return 'unknown'
+      })()
+
+      return await Promise.race([resultPromise, timeoutPromise])
+    } catch {
+      console.log('CEC: Failed to query power state')
+      return 'unknown'
+    }
   }
 }
 

@@ -16,6 +16,8 @@ import type {
 } from '../types'
 
 export class MediaIndexer {
+  private scanInProgress = false
+
   constructor(
     private readonly mediaConfig: MediaConfig,
     private readonly interludeConfig: InterludeConfig,
@@ -25,33 +27,43 @@ export class MediaIndexer {
   ) {}
 
   async scanAll(): Promise<number> {
-    const videoPaths: string[] = []
-    const interludePaths: string[] = []
+    if (this.scanInProgress) {
+      console.log('Scan already in progress, skipping')
+      return 0
+    }
+    this.scanInProgress = true
 
-    // Scan videos (exclude interlude directory to prevent double counting)
-    const videoCount = await this.scanDirectory(
-      this.mediaConfig.directory,
-      false,
-      videoPaths,
-      [this.interludeConfig.directory]
-    )
+    try {
+      const videoPaths: string[] = []
+      const interludePaths: string[] = []
 
-    // Scan interludes
-    const interludeCount = await this.scanDirectory(
-      this.interludeConfig.directory,
-      true,
-      interludePaths
-    )
+      // Scan videos (exclude interlude directory to prevent double counting)
+      const videoCount = await this.scanDirectory(
+        this.mediaConfig.directory,
+        false,
+        videoPaths,
+        [this.interludeConfig.directory]
+      )
 
-    // Remove DB entries for files that no longer exist
-    const allValidPaths = [...videoPaths, ...interludePaths]
-    const removed = await this.repository.removeNotInPaths(allValidPaths)
+      // Scan interludes
+      const interludeCount = await this.scanDirectory(
+        this.interludeConfig.directory,
+        true,
+        interludePaths
+      )
 
-    const total = videoCount + interludeCount
-    console.log(
-      `Indexed ${total} files (${videoCount} videos, ${interludeCount} interludes), removed ${removed} stale`
-    )
-    return total
+      // Remove DB entries for files that no longer exist
+      const allValidPaths = [...videoPaths, ...interludePaths]
+      const removed = await this.repository.removeNotInPaths(allValidPaths)
+
+      const total = videoCount + interludeCount
+      console.log(
+        `Indexed ${total} files (${videoCount} videos, ${interludeCount} interludes), removed ${removed} stale`
+      )
+      return total
+    } finally {
+      this.scanInProgress = false
+    }
   }
 
   private async scanDirectory(
