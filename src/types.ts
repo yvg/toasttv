@@ -95,6 +95,17 @@ export interface IFileSystem {
     excludePaths?: string[]
   ): string[]
   exists(path: string): boolean
+  watch(
+    directory: string,
+    callback: (event: 'add' | 'change' | 'remove', path: string) => void
+  ): FileWatcher
+}
+
+/**
+ * Handle returned by watch() for cleanup
+ */
+export interface FileWatcher {
+  close(): void
 }
 
 export interface IMediaProbe {

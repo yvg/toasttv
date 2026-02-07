@@ -307,6 +307,89 @@ export class MediaRepository implements IMediaRepository {
     }
   }
 
+  // --- Batch Operations ---
+
+  async getByPaths(paths: string[]): Promise<Map<string, MediaItem>> {
+    if (!this.db) throw new Error('Repository not initialized')
+    const result = new Map<string, MediaItem>()
+    if (paths.length === 0) return result
+
+    // SQLite has a limit on number of parameters, chunk into batches of 500
+    const CHUNK_SIZE = 500
+    for (let i = 0; i < paths.length; i += CHUNK_SIZE) {
+      const chunk = paths.slice(i, i + CHUNK_SIZE)
+      const placeholders = chunk.map(() => '?').join(',')
+      const stmt = this.db.prepare(`
+        SELECT id, path, filename, duration_seconds, is_interlude, media_type, date_start, date_end
+        FROM media WHERE path IN (${placeholders})
+      `)
+      const rows = stmt.all(...chunk) as Array<Record<string, unknown>>
+      for (const row of rows) {
+        const item = this.rowToMediaItem(row)
+        result.set(item.path, item)
+      }
+    }
+    return result
+  }
+
+  async upsertBatch(items: MediaItemInput[]): Promise<void> {
+    if (!this.db) throw new Error('Repository not initialized')
+    if (items.length === 0) return
+
+    // Use transaction for performance
+    const stmt = this.db.prepare(`
+      INSERT INTO media (path, filename, duration_seconds, is_interlude, media_type, date_start, date_end)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(path) DO UPDATE SET
+        filename = excluded.filename,
+        duration_seconds = excluded.duration_seconds,
+        is_interlude = CASE 
+          WHEN excluded.media_type IN ('intro', 'outro', 'offair') THEN excluded.is_interlude
+          WHEN excluded.is_interlude = 1 THEN 1 
+          ELSE media.is_interlude 
+        END,
+        media_type = CASE 
+          WHEN excluded.media_type IN ('intro', 'outro', 'offair') THEN excluded.media_type
+          WHEN excluded.media_type = 'interlude' THEN 'interlude' 
+          ELSE media.media_type 
+        END,
+        date_start = COALESCE(media.date_start, excluded.date_start),
+        date_end = COALESCE(media.date_end, excluded.date_end)
+    `)
+
+    const transaction = this.db.transaction(() => {
+      for (const item of items) {
+        stmt.run(
+          item.path,
+          item.filename,
+          item.durationSeconds,
+          item.isInterlude ? 1 : 0,
+          item.mediaType,
+          item.dateStart,
+          item.dateEnd
+        )
+      }
+    })
+    transaction()
+  }
+
+  async removeByPaths(paths: string[]): Promise<number> {
+    if (!this.db) throw new Error('Repository not initialized')
+    if (paths.length === 0) return 0
+
+    let removed = 0
+    const CHUNK_SIZE = 500
+    for (let i = 0; i < paths.length; i += CHUNK_SIZE) {
+      const chunk = paths.slice(i, i + CHUNK_SIZE)
+      const placeholders = chunk.map(() => '?').join(',')
+      const result = this.db
+        .prepare(`DELETE FROM media WHERE path IN (${placeholders})`)
+        .run(...chunk)
+      removed += result.changes
+    }
+    return removed
+  }
+
   async removeNotInPaths(validPaths: string[]): Promise<number> {
     if (!this.db) throw new Error('Repository not initialized')
 

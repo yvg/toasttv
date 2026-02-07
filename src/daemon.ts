@@ -169,17 +169,31 @@ export class ToastTVDaemon {
 
     console.log('ToastTV background services starting...')
 
-    // 4. Run Scan & Connect
-    await this.indexer.scanAll()
-
-    // 5. Create ConfigService and auto-discover special media
-    this.configService = new ConfigService(this.appConfig)
-    const allMedia = await this.repository.getAll()
-    await this.configService.discoverSpecialMedia(allMedia)
-
+    // 4. Connect to player first (fast - enables immediate playback)
     await this.player.connect()
 
-    // 6. Create PlaybackService (needed for CEC and server)
+    // 5. Create ConfigService (needed for PlaybackService)
+    this.configService = new ConfigService(this.appConfig)
+
+    // 6. Run scan in background (non-blocking)
+    // Dashboard may show stale/empty library briefly on first launch
+    this.indexer
+      .scanAll()
+      .then(async (count) => {
+        console.log(`Background scan complete: ${count} files`)
+        // Discover special media after scan completes
+        const allMedia = await this.repository?.getAll()
+        if (allMedia) {
+          await this.configService?.discoverSpecialMedia(allMedia)
+        }
+        // Start file watcher for real-time updates
+        this.indexer?.startWatching()
+      })
+      .catch((e) => {
+        console.error('Background scan failed:', e)
+      })
+
+    // 7. Create PlaybackService (needed for CEC and server)
     this.playbackService = new PlaybackService({
       player: this.player,
       engine: this.engine,

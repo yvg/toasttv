@@ -5,14 +5,18 @@
  */
 
 import { Glob } from 'bun'
-import { existsSync, statSync } from 'node:fs'
-import { basename, extname } from 'node:path'
-import type { IFileSystem, IMediaProbe } from '../types'
+import { existsSync, watch as fsWatch } from 'node:fs'
+import { basename, extname, join } from 'node:path'
+import type { FileWatcher, IFileSystem, IMediaProbe } from '../types'
 
 export class FilesystemClient implements IFileSystem {
-  listFiles(directory: string, extensions: readonly string[], excludePaths: string[] = []): string[] {
+  listFiles(
+    directory: string,
+    extensions: readonly string[],
+    excludePaths: string[] = []
+  ): string[] {
     const files: string[] = []
-    
+
     // Ensure strict absolute path comparison
     // We assume 'directory' might be relative, but glob.scanSync(absolute: true) returns full paths.
     // We must resolve excludePaths relative to CWD if they are relative.
@@ -34,6 +38,30 @@ export class FilesystemClient implements IFileSystem {
 
   exists(path: string): boolean {
     return existsSync(path)
+  }
+
+  /**
+   * Watch a directory for file changes (stateless wrapper for fs.watch)
+   */
+  watch(
+    directory: string,
+    callback: (event: 'add' | 'change' | 'remove', path: string) => void
+  ): FileWatcher {
+    const watcher = fsWatch(
+      directory,
+      { recursive: true },
+      (eventType, filename) => {
+        if (!filename) return
+        const fullPath = join(directory, filename)
+        // fs.watch only knows 'rename' (add/delete) and 'change'
+        // We simplify: 'rename' → 'add' (caller checks existence), 'change' → 'change'
+        callback(eventType === 'rename' ? 'add' : 'change', fullPath)
+      }
+    )
+
+    return {
+      close: () => watcher.close(),
+    }
   }
 }
 

@@ -83,47 +83,105 @@ export class MediaIndexer {
       excludePaths
     )
 
-    let count = 0
+    if (files.length === 0) return 0
+
+    // 1. Batch lookup existing entries
+    const existingMap = await this.repository.getByPaths(files)
+
+    // 2. Separate new files from existing ones
+    const newFiles: string[] = []
+    const existingFiles: string[] = []
+
     for (const filePath of files) {
-      try {
-        const filename = getFilename(filePath)
-
-        // Optimize: Check if file already exists in DB to reuse duration
-        const existing = await this.repository.getByPath(filePath)
-
-        let duration = 0
-        if (existing) {
-          duration = existing.durationSeconds
-        } else {
-          duration = await this.mediaProbe.getDuration(filePath)
-        }
-
-        const mediaType = this.detectMediaType(filename, isInterlude)
-
-        const { start: dateStart, end: dateEnd } = this.detectDates(filename)
-
-        await this.repository.upsertMedia({
-          path: filePath,
-          filename,
-          durationSeconds: duration,
-          isInterlude: mediaType === 'interlude',
-          mediaType,
-          dateStart, // Pass calculated seasonal dates
-          dateEnd,
-        })
-
-        outPaths.push(filePath)
-        count++
-
-        if (!existing) {
-          console.log(`Indexed: ${filename} (${duration}s) [${mediaType}]`)
-        }
-      } catch (error) {
-        console.error(`Failed to index ${filePath}:`, error)
+      if (existingMap.has(filePath)) {
+        existingFiles.push(filePath)
+      } else {
+        newFiles.push(filePath)
       }
     }
 
-    return count
+    // 3. Parallel probe new files with concurrency limit
+    const CONCURRENCY = 4 // Pi Zero 2 W has 4 cores
+    const durations = await this.probeParallel(newFiles, CONCURRENCY)
+
+    // 4. Build items for batch upsert
+    const itemsToUpsert: Array<{
+      path: string
+      filename: string
+      durationSeconds: number
+      isInterlude: boolean
+      mediaType: MediaType
+      dateStart: string | null
+      dateEnd: string | null
+    }> = []
+
+    // Add new files
+    for (let i = 0; i < newFiles.length; i++) {
+      const filePath = newFiles[i]
+      if (!filePath) continue // TypeScript guard
+      const filename = getFilename(filePath)
+      const duration = durations[i] ?? 0
+      const mediaType = this.detectMediaType(filename, isInterlude)
+      const { start: dateStart, end: dateEnd } = this.detectDates(filename)
+
+      itemsToUpsert.push({
+        path: filePath,
+        filename,
+        durationSeconds: duration,
+        isInterlude: mediaType === 'interlude',
+        mediaType,
+        dateStart,
+        dateEnd,
+      })
+
+      console.log(`Indexed: ${filename} (${duration}s) [${mediaType}]`)
+    }
+
+    // Add existing files (reuse duration, but still include in outPaths)
+    for (const filePath of existingFiles) {
+      const existing = existingMap.get(filePath)
+      if (existing) {
+        // No need to re-upsert existing files unless we want to update them
+        outPaths.push(filePath)
+      }
+    }
+
+    // 5. Batch upsert new files
+    if (itemsToUpsert.length > 0) {
+      await this.repository.upsertBatch(itemsToUpsert)
+    }
+
+    // Add new file paths to outPaths
+    outPaths.push(...newFiles)
+
+    return files.length
+  }
+
+  /**
+   * Probe multiple files in parallel with concurrency limit
+   */
+  private async probeParallel(
+    files: string[],
+    concurrency: number
+  ): Promise<number[]> {
+    const results: number[] = []
+
+    for (let i = 0; i < files.length; i += concurrency) {
+      const batch = files.slice(i, i + concurrency)
+      const batchResults = await Promise.all(
+        batch.map(async (filePath) => {
+          try {
+            return await this.mediaProbe.getDuration(filePath)
+          } catch (error) {
+            console.error(`Failed to probe ${filePath}:`, error)
+            return 0
+          }
+        })
+      )
+      results.push(...batchResults)
+    }
+
+    return results
   }
 
   /**
@@ -175,5 +233,111 @@ export class MediaIndexer {
     }
 
     return { start: null, end: null }
+  }
+
+  // --- File Watcher Integration ---
+
+  private watcher: import('./FileWatcherService').FileWatcherService | null =
+    null
+
+  /**
+   * Start watching media directories for changes
+   */
+  startWatching(): void {
+    if (this.watcher) return // Already watching
+
+    // Dynamically import to avoid circular dependency
+    const { FileWatcherService } = require('./FileWatcherService')
+
+    const watcher = new FileWatcherService(
+      this.filesystem,
+      [this.mediaConfig.directory, this.interludeConfig.directory],
+      this.mediaConfig.supportedExtensions
+    )
+
+    watcher.on('batch', (paths: string[]) => {
+      this.indexBatch(paths).catch(console.error)
+    })
+
+    watcher.start()
+    this.watcher = watcher
+    console.log('MediaIndexer: File watcher started')
+  }
+
+  /**
+   * Stop watching media directories
+   */
+  stopWatching(): void {
+    if (this.watcher) {
+      this.watcher.stop()
+      this.watcher = null
+      console.log('MediaIndexer: File watcher stopped')
+    }
+  }
+
+  /**
+   * Index a batch of changed file paths (from file watcher)
+   */
+  async indexBatch(paths: string[]): Promise<number> {
+    if (paths.length === 0) return 0
+
+    // Filter to existing files only (removes may report deleted files)
+    const existingPaths = paths.filter((p) => this.filesystem.exists(p))
+    const deletedPaths = paths.filter((p) => !this.filesystem.exists(p))
+
+    // Remove deleted files from DB
+    if (deletedPaths.length > 0) {
+      const removed = await this.repository.removeByPaths(deletedPaths)
+      console.log(`MediaIndexer: Removed ${removed} deleted files`)
+    }
+
+    if (existingPaths.length === 0) return 0
+
+    // Check which files are new vs existing
+    const existingMap = await this.repository.getByPaths(existingPaths)
+    const newPaths = existingPaths.filter((p) => !existingMap.has(p))
+
+    if (newPaths.length === 0) return 0
+
+    // Probe new files
+    const durations = await this.probeParallel(newPaths, 4)
+
+    const items: Array<{
+      path: string
+      filename: string
+      durationSeconds: number
+      isInterlude: boolean
+      mediaType: MediaType
+      dateStart: string | null
+      dateEnd: string | null
+    }> = []
+
+    for (let i = 0; i < newPaths.length; i++) {
+      const filePath = newPaths[i]
+      if (!filePath) continue
+      const filename = getFilename(filePath)
+      const duration = durations[i] ?? 0
+      const isInterlude = filePath.startsWith(this.interludeConfig.directory)
+      const mediaType = this.detectMediaType(filename, isInterlude)
+      const { start: dateStart, end: dateEnd } = this.detectDates(filename)
+
+      items.push({
+        path: filePath,
+        filename,
+        durationSeconds: duration,
+        isInterlude: mediaType === 'interlude',
+        mediaType,
+        dateStart,
+        dateEnd,
+      })
+
+      console.log(`Indexed (watch): ${filename} (${duration}s) [${mediaType}]`)
+    }
+
+    if (items.length > 0) {
+      await this.repository.upsertBatch(items)
+    }
+
+    return items.length
   }
 }

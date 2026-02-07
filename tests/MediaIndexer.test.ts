@@ -38,6 +38,8 @@ describe('MediaIndexer', () => {
 
     // Default mocks
     repo.upsertMedia.mockResolvedValue()
+    repo.upsertBatch.mockResolvedValue()
+    repo.getByPaths.mockResolvedValue(new Map()) // All files are new by default
     repo.removeNotInPaths.mockResolvedValue(0)
     fs.exists.mockReturnValue(true)
     fs.listFiles.mockReturnValue([]) // Default to empty list
@@ -61,17 +63,31 @@ describe('MediaIndexer', () => {
     const result = await indexer.scanAll()
 
     expect(result).toBe(3) // 2 videos + 1 interlude
-    expect(repo.upsertMedia).toHaveBeenCalledTimes(3)
-    // Verify video call
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'show1.mp4',
-        mediaType: 'video',
-        isInterlude: false,
-      })
+    // Now using batch upsert - called once per directory scan
+    expect(repo.upsertBatch).toHaveBeenCalledTimes(2)
+
+    // Check first batch (videos)
+    const videoBatchCall = repo.upsertBatch.mock.calls[0]?.[0]
+    expect(videoBatchCall).toHaveLength(2)
+    expect(videoBatchCall).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: 'show1.mp4',
+          mediaType: 'video',
+          isInterlude: false,
+        }),
+        expect.objectContaining({
+          filename: 'show2.mp4',
+          mediaType: 'video',
+          isInterlude: false,
+        }),
+      ])
     )
-    // Verify interlude call
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
+
+    // Check second batch (interludes)
+    const interludeBatchCall = repo.upsertBatch.mock.calls[1]?.[0]
+    expect(interludeBatchCall).toHaveLength(1)
+    expect(interludeBatchCall?.[0]).toEqual(
       expect.objectContaining({
         filename: 'bump.mp4',
         mediaType: 'interlude',
@@ -87,7 +103,7 @@ describe('MediaIndexer', () => {
     const result = await indexer.scanAll()
 
     expect(result).toBe(0)
-    expect(repo.upsertMedia).not.toHaveBeenCalled()
+    expect(repo.upsertBatch).not.toHaveBeenCalled()
   })
 
   test('scanAll marks interludes correctly', async () => {
@@ -97,13 +113,17 @@ describe('MediaIndexer', () => {
 
     await indexer.scanAll()
 
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
+    // Videos batch
+    const videoBatch = repo.upsertBatch.mock.calls[0]?.[0]
+    expect(videoBatch?.[0]).toEqual(
       expect.objectContaining({
         filename: 'show.mp4',
         isInterlude: false,
       })
     )
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
+    // Interludes batch
+    const interludeBatch = repo.upsertBatch.mock.calls[1]?.[0]
+    expect(interludeBatch?.[0]).toEqual(
       expect.objectContaining({
         filename: 'bump.mp4',
         isInterlude: true,
@@ -123,22 +143,29 @@ describe('MediaIndexer', () => {
 
     await indexer.scanAll()
 
+    // Second batch call has interludes (first is empty videos)
+    const interludeBatch = repo.upsertBatch.mock.calls[0]?.[0]
+
     // Verify Xmas
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'penny_xmas.mp4',
-        dateStart: '12-01',
-        dateEnd: '12-26',
-      })
+    expect(interludeBatch).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: 'penny_xmas.mp4',
+          dateStart: '12-01',
+          dateEnd: '12-26',
+        }),
+      ])
     )
 
     // Verify Summer
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'penny_summer.mp4',
-        dateStart: '06-01',
-        dateEnd: '08-31',
-      })
+    expect(interludeBatch).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: 'penny_summer.mp4',
+          dateStart: '06-01',
+          dateEnd: '08-31',
+        }),
+      ])
     )
   })
 
@@ -154,40 +181,33 @@ describe('MediaIndexer', () => {
 
     await indexer.scanAll()
 
-    // Verify Intro 1
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'mylogo_intro.mp4',
-        mediaType: 'intro',
-        isInterlude: false,
-      })
-    )
+    const videoBatch = repo.upsertBatch.mock.calls[0]?.[0]
+    expect(videoBatch).toHaveLength(4)
 
-    // Verify Intro 2 (Should now be intro, not video - BUG FIX)
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'other_intro.mp4',
-        mediaType: 'intro',
-        isInterlude: false,
-      })
-    )
-
-    // Verify Bedtime -> maps to offair
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'sleepy_bedtime.mp4',
-        mediaType: 'offair',
-        isInterlude: false,
-      })
-    )
-
-    // Verify Outro
-    expect(repo.upsertMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filename: 'credits_outro.mp4',
-        mediaType: 'outro',
-        isInterlude: false,
-      })
+    // Verify all special media types detected
+    expect(videoBatch).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: 'mylogo_intro.mp4',
+          mediaType: 'intro',
+          isInterlude: false,
+        }),
+        expect.objectContaining({
+          filename: 'other_intro.mp4',
+          mediaType: 'intro',
+          isInterlude: false,
+        }),
+        expect.objectContaining({
+          filename: 'sleepy_bedtime.mp4',
+          mediaType: 'offair',
+          isInterlude: false,
+        }),
+        expect.objectContaining({
+          filename: 'credits_outro.mp4',
+          mediaType: 'outro',
+          isInterlude: false,
+        }),
+      ])
     )
   })
 })

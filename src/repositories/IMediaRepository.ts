@@ -95,6 +95,24 @@ export interface IMediaRepository {
     dateEnd: string | null
   ): Promise<void>
 
+  // --- Batch Operations (for parallel scanning) ---
+
+  /**
+   * Get multiple media items by paths in a single query
+   * Returns a Map for O(1) lookups
+   */
+  getByPaths(paths: string[]): Promise<Map<string, MediaItem>>
+
+  /**
+   * Insert or update multiple media items in a single transaction
+   */
+  upsertBatch(items: MediaItemInput[]): Promise<void>
+
+  /**
+   * Remove media items by paths
+   */
+  removeByPaths(paths: string[]): Promise<number>
+
   /**
    * Remove all media entries whose paths are not in the given list
    * Used during rescan to clean up deleted files
